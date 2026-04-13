@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { createQRCodeId, generateQRCodeDataUrl } from '@/lib/qr-utils'
-import { verifyAuth, AuthError } from '@/lib/auth-middleware'
+import { verifySupabaseAuth, AuthError } from '@/lib/auth-middleware'
 import { normalizeMealType } from '@/lib/meal-type'
 import { z } from 'zod'
 
@@ -23,7 +23,7 @@ function getSupabaseAdminClient() {
 // Get all tokens for a student
 export async function GET(request: NextRequest) {
   try {
-    const user = verifyAuth(request, ['student', 'admin'])
+    const user = await verifySupabaseAuth(request, ['student', 'admin'])
     const supabase = getSupabaseAdminClient()
     const studentId = request.nextUrl.searchParams.get('studentId')
     
@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
 // Create a new token
 export async function POST(request: NextRequest) {
   try {
-    const user = verifyAuth(request, ['student', 'admin'])
+    const user = await verifySupabaseAuth(request, ['student', 'admin'])
     const supabase = getSupabaseAdminClient()
     const body = await request.json()
     const parsed = z.object({
@@ -295,7 +295,7 @@ export async function POST(request: NextRequest) {
 // Cancel a token (before it is used)
 export async function PATCH(request: NextRequest) {
   try {
-    const user = verifyAuth(request, ['student', 'admin'])
+    const user = await verifySupabaseAuth(request, ['student', 'admin'])
     const supabase = getSupabaseAdminClient()
     const { tokenId, studentId } = await request.json()
 

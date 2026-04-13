@@ -1,4 +1,5 @@
 import jwt, { JwtPayload } from 'jsonwebtoken'
+import { createClient } from '@supabase/supabase-js'
 
 export type AppRole = 'student' | 'staff' | 'admin'
 
@@ -116,4 +117,104 @@ export function requireRoles(req: Request, roles: AppRole[]): AuthUser {
   }
 
   return user
+}
+
+export async function verifySupabaseAuth(req: Request, allowedRoles?: AppRole[]): Promise<AuthUser> {
+  const authHeader = req.headers.get('authorization')
+  if (!authHeader) {
+    throw new AuthError('No token', 401)
+  }
+
+  const [scheme, token] = authHeader.split(' ')
+  if (scheme !== 'Bearer' || !token) {
+    throw new AuthError('Invalid authorization header', 401)
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !anonKey) {
+    throw new AuthError('Missing Supabase auth environment variables', 500)
+  }
+
+  const authClient = createClient(supabaseUrl, anonKey)
+  const { data: authData, error: authError } = await authClient.auth.getUser(token)
+
+  if (authError || !authData?.user) {
+    throw new AuthError('Invalid token', 401)
+  }
+
+  const headerRole = req.headers.get('x-user-role')
+  const headerUserId = req.headers.get('x-user-id')
+  const headerStudentId = req.headers.get('x-student-id')
+  const headerStaffId = req.headers.get('x-staff-id')
+
+  let resolvedRole: AppRole | null =
+    headerRole === 'student' || headerRole === 'staff' || headerRole === 'admin'
+      ? headerRole
+      : null
+
+  let resolvedUserId: string | null = headerUserId || authData.user.id || null
+  let resolvedStudentId: string | undefined = headerStudentId || undefined
+  let resolvedStaffId: string | undefined = headerStaffId || undefined
+
+  const metaRole = authData.user.app_metadata?.role || authData.user.user_metadata?.role
+  if (!resolvedRole && (metaRole === 'student' || metaRole === 'staff' || metaRole === 'admin')) {
+    resolvedRole = metaRole
+  }
+
+  // Resolve app-specific role and profile ids from DB when client headers/metadata are missing.
+  if ((!resolvedRole || !headerUserId || (resolvedRole === 'student' && !resolvedStudentId) || (resolvedRole === 'staff' && !resolvedStaffId)) && serviceRoleKey && authData.user.email) {
+    const adminClient = createClient(supabaseUrl, serviceRoleKey)
+
+    const { data: appUser } = await adminClient
+      .from('users')
+      .select('id, role')
+      .eq('email', authData.user.email)
+      .maybeSingle()
+
+    if (appUser?.id) {
+      resolvedUserId = appUser.id
+    }
+
+    if (!resolvedRole && (appUser?.role === 'student' || appUser?.role === 'staff' || appUser?.role === 'admin')) {
+      resolvedRole = appUser.role
+    }
+
+    if (resolvedRole === 'student' && !resolvedStudentId && appUser?.id) {
+      const { data: student } = await adminClient
+        .from('students')
+        .select('id')
+        .eq('user_id', appUser.id)
+        .maybeSingle()
+
+      resolvedStudentId = student?.id || undefined
+    }
+
+    if (resolvedRole === 'staff' && !resolvedStaffId && appUser?.id) {
+      const { data: staff } = await adminClient
+        .from('staff')
+        .select('id')
+        .eq('user_id', appUser.id)
+        .maybeSingle()
+
+      resolvedStaffId = staff?.id || undefined
+    }
+  }
+
+  if (!resolvedRole || !resolvedUserId) {
+    throw new AuthError('Invalid token payload', 401)
+  }
+
+  if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(resolvedRole)) {
+    throw new AuthError('Unauthorized', 403)
+  }
+
+  return {
+    userId: resolvedUserId,
+    role: resolvedRole,
+    studentId: resolvedStudentId,
+    staffId: resolvedStaffId,
+  }
 }
