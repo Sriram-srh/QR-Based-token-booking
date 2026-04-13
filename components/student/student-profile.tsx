@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { getAuthHeaders } from "@/lib/client-auth"
+import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -57,19 +57,27 @@ export function StudentProfile() {
 
     try {
       setUpdatingPassword(true)
-      const response = await fetch('/api/auth/change-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({
-          userId: user.id,
-          currentPassword,
-          newPassword,
-        }),
+      if (!user.email) {
+        setPasswordError('Session expired. Please sign in again.')
+        return
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
       })
 
-      const data = await response.json()
-      if (!response.ok) {
-        setPasswordError(data.error || 'Failed to update password')
+      if (signInError) {
+        setPasswordError('Current password is incorrect')
+        return
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (updateError) {
+        setPasswordError(updateError.message || 'Failed to update password')
         return
       }
 
