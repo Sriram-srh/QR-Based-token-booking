@@ -92,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [auth, setAuth] = useState<AuthState>({
     isLoggedIn: false,
     user: null,
-    loading: false,
+    loading: true,
     error: null,
   })
 
@@ -140,6 +140,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem('token')
       }
     }
+
+    // Finish loading after session restore attempt
+    setAuth(prev => ({
+      ...prev,
+      loading: false
+    }))
   }, [])
 
   // Listen to real-time Supabase auth state changes

@@ -23,7 +23,7 @@ import { AuditLogs } from "@/components/admin/audit-logs"
 import { AdminSettings } from "@/components/admin/admin-settings"
 
 function AppContent() {
-  const { isLoggedIn, user, role } = useAuth()
+  const { isLoggedIn, user, role, loading } = useAuth()
   const [activeTab, setActiveTab] = useState("dashboard")
 
   const userType = role || user?.role || user?.userType
@@ -53,6 +53,10 @@ function AppContent() {
     if (allowedTabs.includes(tab)) {
       setActiveTab(tab)
     }
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
 
   if (!isLoggedIn) {
