@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get student info for verification
-    const studentInfo = await getStudentInfo(scanResult.studentId || '');
+    const studentInfo: any = await getStudentInfo(scanResult.studentId || '');
 
     // Log successful scan
     await logAuditEvent(

@@ -87,8 +87,8 @@ export async function createMealToken(
 
     const supabase = getSupabaseAdminClient();
 
-    let { data, error } = await supabase
-      .from('meal_tokens')
+    let { data, error } = await (supabase
+      .from('meal_tokens') as any)
       .insert([
         {
           student_id: studentId,
@@ -105,8 +105,8 @@ export async function createMealToken(
       .single();
 
     if (error && String(error.message || '').toLowerCase().includes('backup_code')) {
-      const fallback = await supabase
-        .from('meal_tokens')
+      const fallback = await (supabase
+        .from('meal_tokens') as any)
         .insert([
           {
             student_id: studentId,
@@ -130,7 +130,7 @@ export async function createMealToken(
       return null;
     }
 
-    return data as MealToken;
+    return data as unknown as MealToken;
   } catch (err) {
     console.error('[v0] Exception creating meal token:', err);
     return null;
@@ -166,7 +166,7 @@ export async function getMealTokenByQRCode(qrCode: string): Promise<MealToken | 
       return null;
     }
 
-    return data as MealToken;
+    return data as unknown as MealToken;
   } catch (err) {
     console.error('[v0] Exception fetching meal token:', err);
     return null;
@@ -189,7 +189,7 @@ export async function getMealTokenById(tokenId: string): Promise<MealToken | nul
       return null;
     }
 
-    return data as MealToken;
+    return data as unknown as MealToken;
   } catch (err) {
     console.error('[v0] Exception fetching meal token by ID:', err);
     return null;
@@ -204,8 +204,8 @@ export async function markTokenAsScanned(
   counterId: string
 ): Promise<MealToken | null> {
   try {
-    const { data, error } = await getSupabaseAdminClient()
-      .from('meal_tokens')
+    const { data, error } = await (getSupabaseAdminClient()
+      .from('meal_tokens') as any)
       .update({
         status: 'USED',
         scanned_at: new Date().toISOString(),
@@ -247,7 +247,7 @@ export async function getStudentTokensByMealType(
       return [];
     }
 
-    return data as MealToken[];
+    return data as unknown as MealToken[];
   } catch (err) {
     console.error('[v0] Exception fetching student tokens:', err);
     return [];
@@ -368,7 +368,7 @@ export async function logAuditEvent(
   details: Record<string, unknown>
 ): Promise<boolean> {
   try {
-    const { error } = await getSupabaseAdminClient().from('audit_logs').insert([
+    const { error } = await (getSupabaseAdminClient().from('audit_logs') as any).insert([
       {
         action,
         user_id: userId,
@@ -432,8 +432,8 @@ export async function createStudent(
     const hashedPassword = await bcrypt.hash('password123', 10);
 
     // Create user account
-    const { data: userData, error: userError } = await supabase
-      .from('users')
+    const { data: userData, error: userError } = await (supabase
+      .from('users') as any)
       .insert([
         {
           email,
@@ -452,8 +452,8 @@ export async function createStudent(
     }
 
     // Create student record
-    const { data: studentData, error: studentError } = await supabase
-      .from('students')
+    const { data: studentData, error: studentError } = await (supabase
+      .from('students') as any)
       .insert([
         {
           user_id: userData.id,
