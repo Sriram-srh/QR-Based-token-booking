@@ -10,8 +10,23 @@ export function getAuthHeaders(): Record<string, string> {
     return {}
   }
 
+  const userRaw = window.localStorage.getItem('user')
+  let user: any = null
+
+  if (userRaw) {
+    try {
+      user = JSON.parse(userRaw)
+    } catch {
+      user = null
+    }
+  }
+
   return {
     Authorization: `Bearer ${token}`,
+    ...(user?.role ? { 'X-User-Role': String(user.role) } : {}),
+    ...(user?.id ? { 'X-User-Id': String(user.id) } : {}),
+    ...(user?.studentId ? { 'X-Student-Id': String(user.studentId) } : {}),
+    ...(user?.staffId ? { 'X-Staff-Id': String(user.staffId) } : {}),
   }
 }
 

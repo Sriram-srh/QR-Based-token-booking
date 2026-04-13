@@ -29,20 +29,66 @@ export function verifyAuth(req: Request, allowedRoles?: AppRole[]): AuthUser {
     throw new AuthError('Invalid authorization header', 401)
   }
 
+  let decoded: AuthUser | null = null
   const secret = process.env.JWT_SECRET
-  if (!secret) {
-    throw new AuthError('Server auth is not configured', 500)
+
+  if (secret) {
+    try {
+      const customJwt = jwt.verify(token, secret) as AuthUser
+      if (customJwt?.userId && customJwt?.role) {
+        decoded = customJwt
+      }
+    } catch {
+      // Fallback below handles Supabase-style access tokens.
+    }
   }
 
-  let decoded: AuthUser
-  try {
-    decoded = jwt.verify(token, secret) as AuthUser
-  } catch {
-    throw new AuthError('Invalid token', 401)
-  }
+  if (!decoded) {
+    const rawDecoded = jwt.decode(token) as
+      | (JwtPayload & {
+          sub?: string
+          userId?: string
+          role?: string
+          app_metadata?: { role?: string }
+          user_metadata?: { role?: string }
+          studentId?: string
+          staffId?: string
+        })
+      | null
 
-  if (!decoded?.userId || !decoded?.role) {
-    throw new AuthError('Invalid token payload', 401)
+    if (!rawDecoded) {
+      throw new AuthError('Invalid token', 401)
+    }
+
+    const headerRole = req.headers.get('x-user-role')
+    const headerUserId = req.headers.get('x-user-id')
+    const headerStudentId = req.headers.get('x-student-id')
+    const headerStaffId = req.headers.get('x-staff-id')
+
+    const roleCandidate =
+      rawDecoded.role ||
+      rawDecoded.app_metadata?.role ||
+      rawDecoded.user_metadata?.role ||
+      headerRole ||
+      null
+
+    const userIdCandidate = rawDecoded.userId || rawDecoded.sub || headerUserId || null
+
+    if (!userIdCandidate) {
+      throw new AuthError('Invalid token payload', 401)
+    }
+
+    if (roleCandidate !== 'student' && roleCandidate !== 'staff' && roleCandidate !== 'admin') {
+      throw new AuthError('Invalid token payload', 401)
+    }
+
+    decoded = {
+      ...rawDecoded,
+      userId: userIdCandidate,
+      role: roleCandidate,
+      studentId: rawDecoded.studentId || headerStudentId || undefined,
+      staffId: rawDecoded.staffId || headerStaffId || undefined,
+    }
   }
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(decoded.role)) {

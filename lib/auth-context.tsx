@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
+import { supabase } from "@/lib/supabase"
 
 export type UserType = 'student' | 'staff' | 'admin'
 
@@ -144,24 +145,88 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string, userType: UserType) => {
     setAuth(prev => ({ ...prev, loading: true, error: null }))
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, userType })
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Login failed')
+      if (authError) {
+        throw new Error(authError.message)
       }
 
-      const { user, token } = await response.json()
-      const normalizedUser = normalizeUser(user)
-      localStorage.setItem('user', JSON.stringify(normalizedUser))
-      if (token) {
-        localStorage.setItem('auth_token', token)
-        localStorage.setItem('token', token)
+      const token = authData.session?.access_token
+      const authEmail = authData.user?.email
+
+      if (!token || !authEmail) {
+        throw new Error('Login failed: missing Supabase session data')
       }
+
+      const { data: dbUser, error: dbUserError } = await supabase
+        .from('users')
+        .select('id, email, name, role')
+        .eq('email', authEmail)
+        .single()
+
+      if (dbUserError || !dbUser) {
+        throw new Error('Unable to load user profile')
+      }
+
+      if (dbUser.role !== userType) {
+        throw new Error('User type mismatch')
+      }
+
+      let additionalData: Record<string, unknown> = {}
+
+      if (dbUser.role === 'student') {
+        const { data: student } = await supabase
+          .from('students')
+          .select('id, register_number, hostel, room, phone, photo_url')
+          .eq('user_id', dbUser.id)
+          .maybeSingle()
+
+        additionalData = student
+          ? {
+              studentId: student.id,
+              registerNumber: student.register_number,
+              hostel: student.hostel,
+              room: student.room,
+              phone: student.phone,
+              photoUrl: student.photo_url,
+            }
+          : {}
+      } else if (dbUser.role === 'staff') {
+        const { data: staff } = await supabase
+          .from('staff')
+          .select('id')
+          .eq('user_id', dbUser.id)
+          .maybeSingle()
+
+        const { data: assignedCounter } = staff
+          ? await supabase
+              .from('counters')
+              .select('id, name')
+              .eq('assigned_staff_id', staff.id)
+              .maybeSingle()
+          : { data: null }
+
+        additionalData = staff
+          ? {
+              staffId: staff.id,
+              counterId: assignedCounter?.id || null,
+              counterName: assignedCounter?.name || null,
+            }
+          : {}
+      }
+
+      const normalizedUser = normalizeUser({
+        ...dbUser,
+        ...additionalData,
+        userType: dbUser.role,
+      })
+
+      localStorage.setItem('user', JSON.stringify(normalizedUser))
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('token', token)
       
       setAuth({
         isLoggedIn: true,
@@ -181,6 +246,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
+    void supabase.auth.signOut()
     localStorage.removeItem('user')
     localStorage.removeItem('auth_token')
     localStorage.removeItem('token')
