@@ -142,6 +142,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Listen to real-time Supabase auth state changes
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (!session) {
+          // Session ended, clear auth immediately
+          localStorage.removeItem('user')
+          localStorage.removeItem('auth_token')
+          localStorage.removeItem('token')
+          setAuth({ isLoggedIn: false, user: null, loading: false, error: null })
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // Session active or refreshed, keep current auth state
+          // The login flow already set up the user data
+        }
+      }
+    )
+
+    return () => {
+      listener?.subscription.unsubscribe()
+    }
+  }, [])
+
   const login = useCallback(async (email: string, password: string, userType: UserType) => {
     setAuth(prev => ({ ...prev, loading: true, error: null }))
     try {
