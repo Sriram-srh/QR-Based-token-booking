@@ -2,6 +2,28 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/db-service';
 import { requireRoleAsync, AuthError } from '@/lib/auth-middleware';
 
+async function waitForSyncedUserRow(supabase: any, userId: string, retries = 5, delayMs = 200) {
+  let userRow = null;
+
+  while (retries > 0) {
+    const { data } = await supabase
+      .from('users')
+      .select('id, name, email, role, is_active')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (data) {
+      userRow = data;
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    retries--;
+  }
+
+  return userRow;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireRoleAsync(request, 'admin');
@@ -154,6 +176,13 @@ export async function POST(request: NextRequest) {
 
     const authUserId = authCreated.user.id;
 
+    const userRow = await waitForSyncedUserRow(supabase, authUserId);
+
+    if (!userRow) {
+      await supabase.auth.admin.deleteUser(authUserId);
+      return NextResponse.json({ error: 'User sync failed' }, { status: 500 });
+    }
+
     // Trigger will auto-create users row with metadata from auth.users
     // Just wait a moment for trigger execution, then create staff record
     const { data: staffData, error: staffError } = await supabase
@@ -190,7 +219,7 @@ export async function POST(request: NextRequest) {
         staff: {
           id: staffData.id,
           userId: authUserId,
-          name: userData?.name || 'Staff Member',
+          name: userRow?.name || 'Staff Member',
           email: email,
           employeeNumber: staffData.employee_number,
           assignedCounter: null,

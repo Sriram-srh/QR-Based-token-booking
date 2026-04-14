@@ -36,6 +36,28 @@ export function getSupabaseAdminClient() {
   return adminClient;
 }
 
+async function waitForSyncedUserRow(supabase: ReturnType<typeof createClient>, userId: string, retries = 5, delayMs = 200) {
+  let userRow = null;
+
+  while (retries > 0) {
+    const { data } = await supabase
+      .from('users')
+      .select('id, name, email, role, is_active')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (data) {
+      userRow = data;
+      break;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    retries--;
+  }
+
+  return userRow;
+}
+
 export interface MealToken {
   id: string;
   student_id: string;
@@ -443,6 +465,14 @@ export async function createStudent(
     }
 
     const authUserId = authCreated.user.id;
+
+    const userRow = await waitForSyncedUserRow(supabase, authUserId);
+
+    if (!userRow) {
+      await supabase.auth.admin.deleteUser(authUserId);
+      console.error('[v0] Error waiting for synced user row:', authUserId);
+      return { success: false, error: 'User sync failed' };
+    }
 
     // Trigger will auto-create users row from auth.users user_metadata
     // Just create student record linked to auth user
