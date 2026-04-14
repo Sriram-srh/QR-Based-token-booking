@@ -64,8 +64,12 @@ function AppContent() {
       console.log("⏳ STILL LOADING, ignoring tab click:", tab)
       return
     }
-    console.log("TAB CLICK:", tab)
+    console.log("TAB CLICK:", tab, "TYPE:", typeof tab)
     console.log("ALLOWED TABS:", allowedTabs)
+    if (typeof tab !== "string") {
+      console.error("❌ ERROR: tab parameter is not a string!", { tab, type: typeof tab })
+      return
+    }
     if (allowedTabs.includes(tab)) {
       setActiveTab(tab)
     } else {
