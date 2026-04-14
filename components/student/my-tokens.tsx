@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { clearAuthSession, getAuthHeaders, isAuthFailureStatus, parseJsonSafe } from "@/lib/client-auth"
+import { clearAuthSession, getAuthHeadersAsync, isAuthFailureStatus, parseJsonSafe } from "@/lib/client-auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -238,11 +238,10 @@ export function MyTokens() {
 
     try {
       setLoading(true)
-      const response = await fetch(`/api/tokens?studentId=${user.studentId}`, {
+      const headers = await getAuthHeadersAsync()
+      const response = await fetch(`/api/tokens?studentId=${user.studentId}`, { 
         cache: 'no-store',
-        headers: {
-          ...getAuthHeaders(),
-        },
+        headers,
       })
       const data = await parseJsonSafe(response)
 
@@ -301,9 +300,10 @@ export function MyTokens() {
 
     try {
       setActionLoading(true)
-      const response = await fetch('/api/tokens', {
+      const headers = await getAuthHeadersAsync()
+      const response = await fetch('/api/tokens', { 
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ tokenId: cancelToken, studentId: user.studentId }),
       })
 

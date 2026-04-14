@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { getAuthHeaders, parseJsonSafe } from "@/lib/client-auth"
+import { getAuthHeadersAsync, parseJsonSafe } from "@/lib/client-auth"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -92,7 +92,8 @@ export function DashboardShell({
     if (!user?.id) return
 
     try {
-      const response = await fetch(`/api/notifications?userId=${user.id}`, { cache: 'no-store', headers: { ...getAuthHeaders() } })
+      const headers = await getAuthHeadersAsync()
+      const response = await fetch(`/api/notifications?userId=${user.id}`, { cache: 'no-store', headers })
       if (!response.ok) {
         return
       }
@@ -117,9 +118,10 @@ export function DashboardShell({
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)))
 
     try {
+      const headers = await getAuthHeadersAsync()
       const response = await fetch('/api/notifications/mark-read', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ id, userId: user.id }),
       })
 

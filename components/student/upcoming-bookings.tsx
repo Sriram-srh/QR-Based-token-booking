@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Coffee, Sun, Moon, Trash2, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { getAuthHeaders, parseJsonSafe } from "@/lib/client-auth"
+import { getAuthHeadersAsync, parseJsonSafe } from "@/lib/client-auth"
 
 type PreBooking = {
   id: string
@@ -38,11 +38,10 @@ export function UpcomingBookings({ onNavigateToUpcoming }: { onNavigateToUpcomin
     const load = async () => {
       if (!student?.id) return
       try {
+        const headers = await getAuthHeadersAsync()
         const response = await fetch(`/api/pre-bookings?studentId=${student.id}`, {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeaders(),
-          },
+          headers,
         })
         if (!response.ok) {
           setPendingBookings([])

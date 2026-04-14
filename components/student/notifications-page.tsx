@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { getAuthHeaders, parseJsonSafe } from "@/lib/client-auth"
+import { getAuthHeadersAsync, parseJsonSafe } from "@/lib/client-auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -57,7 +57,8 @@ export function NotificationsPage() {
 
     try {
       setLoading(true)
-      const response = await fetch(`/api/notifications?userId=${user.id}`, { cache: 'no-store', headers: { ...getAuthHeaders() } })
+      const headers = await getAuthHeadersAsync()
+      const response = await fetch(`/api/notifications?userId=${user.id}`, { cache: 'no-store', headers })
       if (!response.ok) {
         throw new Error('Failed to fetch notifications')
       }
@@ -87,9 +88,10 @@ export function NotificationsPage() {
     setNotifications(prev => prev.map(n => (n.id === id ? { ...n, read: true } : n)))
 
     try {
+      const headers = await getAuthHeadersAsync()
       const response = await fetch('/api/notifications/mark-read', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ id, userId: user.id }),
       })
 
@@ -106,9 +108,10 @@ export function NotificationsPage() {
     if (!user?.id) return
 
     try {
+      const headers = await getAuthHeadersAsync()
       const response = await fetch('/api/notifications/read-all', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ userId: user.id }),
       })
 

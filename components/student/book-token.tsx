@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
-import { getAuthHeaders } from "@/lib/client-auth"
+import { getAuthHeadersAsync } from "@/lib/client-auth"
 import type { Meal, MealType, MenuItem, BookedItem } from "@/lib/mock-data"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -90,7 +90,8 @@ export function BookToken({ onNavigate }: { onNavigate: (tab: string) => void })
   useEffect(() => {
     const fetchMeals = async () => {
       try {
-        const response = await fetch('/api/meals?view=student', { cache: 'no-store', headers: { ...getAuthHeaders() } })
+        const headers = await getAuthHeadersAsync()
+        const response = await fetch('/api/meals?view=student', { cache: 'no-store', headers })
         const payload = await response.json()
         if (!response.ok) return
 
@@ -115,10 +116,11 @@ export function BookToken({ onNavigate }: { onNavigate: (tab: string) => void })
     try {
       setBooking(true)
       setBookingError(null)
+      const headers = await getAuthHeadersAsync()
 
       const response = await fetch('/api/tokens', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({
           studentId: user.studentId,
           mealType: confirmMeal,

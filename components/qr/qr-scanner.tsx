@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { getAuthHeaders, parseJsonSafe } from '@/lib/client-auth';
+import { getAuthHeadersAsync, parseJsonSafe } from '@/lib/client-auth';
 import { toast } from 'sonner';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
@@ -140,9 +140,10 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
 
     setLoading(true);
     try {
+      const headers = await getAuthHeadersAsync();
       const response = await fetch('/api/qr/scan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({
           qrCode,
           counterId,

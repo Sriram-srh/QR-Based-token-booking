@@ -22,7 +22,7 @@ import {
   History,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
-import { getAuthHeaders } from "@/lib/client-auth"
+import { getAuthHeadersAsync } from "@/lib/client-auth"
 
 const mealIcons: Record<string, React.ReactNode> = {
   Breakfast: <Coffee className="h-4 w-4" />,
@@ -38,11 +38,10 @@ export function StudentBilling() {
     const load = async () => {
       if (!student?.id) return
       try {
+        const headers = await getAuthHeadersAsync()
         const response = await fetch(`/api/tokens?studentId=${student.id}`, {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeaders(),
-          },
+          headers,
         })
         if (!response.ok) {
           setTokens([])

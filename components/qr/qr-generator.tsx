@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { getAuthHeaders, parseJsonSafe } from '@/lib/client-auth';
+import { getAuthHeadersAsync, parseJsonSafe } from '@/lib/client-auth';
 
 interface QRGeneratorProps {
   onSuccess?: (token: any) => void;
@@ -44,9 +44,10 @@ export function QRGenerator({ onSuccess }: QRGeneratorProps) {
 
     setLoading(true);
     try {
+      const headers = await getAuthHeadersAsync();
       const response = await fetch('/api/qr/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({
           studentId,
           mealType,

@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { getAuthHeaders } from "@/lib/client-auth"
+import { getAuthHeadersAsync } from "@/lib/client-auth"
 import {
   CheckCircle2,
   UtensilsCrossed,
@@ -38,11 +38,10 @@ export function VerificationScreen() {
   useEffect(() => {
     const loadCounters = async () => {
       try {
+        const headers = await getAuthHeadersAsync()
         const response = await fetch('/api/counters', {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeaders(),
-          },
+          headers,
         })
 
         if (!response.ok) {

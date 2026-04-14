@@ -22,7 +22,7 @@ import {
   ArrowRight,
   User,
 } from "lucide-react"
-import { getAuthHeaders, parseJsonSafe } from "@/lib/client-auth"
+import { getAuthHeadersAsync, parseJsonSafe } from "@/lib/client-auth"
 
 const mealIcons: Record<string, React.ReactNode> = {
   Breakfast: <Coffee className="h-5 w-5" />,
@@ -90,11 +90,10 @@ export function StudentDashboard({ onNavigate }: { onNavigate: (tab: string) => 
     const fetchTokens = async () => {
       if (!student?.id) return
       try {
+        const headers = await getAuthHeadersAsync()
         const response = await fetch(`/api/tokens?studentId=${student.id}`, {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeaders(),
-          },
+          headers,
         })
         if (!response.ok) {
           setTokens([])
@@ -116,7 +115,8 @@ export function StudentDashboard({ onNavigate }: { onNavigate: (tab: string) => 
 
     const fetchMeals = async () => {
       try {
-        const response = await fetch('/api/meals?view=student', { cache: 'no-store', headers: { ...getAuthHeaders() } })
+        const headers = await getAuthHeadersAsync()
+        const response = await fetch('/api/meals?view=student', { cache: 'no-store', headers })
         const payload = await parseJsonSafe(response)
         if (!response.ok) return
 

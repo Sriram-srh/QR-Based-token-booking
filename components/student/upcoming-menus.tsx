@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { getMealCost } from "@/lib/mock-data"
 import type { Meal, MenuItem, PreBooking } from "@/lib/mock-data"
 import { useAuth } from "@/lib/auth-context"
-import { getAuthHeaders, parseJsonSafe } from "@/lib/client-auth"
+import { getAuthHeadersAsync, parseJsonSafe } from "@/lib/client-auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -76,7 +76,8 @@ export function UpcomingMenus() {
   // ✅ FIX 2: Fetch meals from API with auto-refresh
   const fetchMeals = async () => {
     try {
-      const response = await fetch('/api/meals?view=student', { cache: 'no-store', headers: { ...getAuthHeaders() } })
+      const headers = await getAuthHeadersAsync()
+      const response = await fetch('/api/meals?view=student', { cache: 'no-store', headers })
       const data = await parseJsonSafe(response)
 
       if (!response.ok) {
@@ -104,11 +105,10 @@ export function UpcomingMenus() {
     if (!studentId) return
 
     try {
+      const headers = await getAuthHeadersAsync()
       const response = await fetch(`/api/pre-bookings?studentId=${studentId}`, {
         cache: 'no-store',
-        headers: {
-          ...getAuthHeaders(),
-        },
+        headers,
       })
       const data = await parseJsonSafe(response)
 
@@ -187,6 +187,7 @@ export function UpcomingMenus() {
 
     setSubmitting(true)
     try {
+      const headers = await getAuthHeadersAsync()
       const payloadItems = selectedItems.map(item => ({
         itemId: item.id,
         name: item.name,
@@ -196,7 +197,7 @@ export function UpcomingMenus() {
 
       const response = await fetch('/api/pre-bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({
           studentId,
           mealDate: selectedMeal.date,
