@@ -44,6 +44,10 @@ function AppContent() {
   const defaultTab = userType === "staff" ? "verify" : "dashboard"
 
   useEffect(() => {
+    if (allowedTabs.length === 0) {
+      // Not loaded yet, skip
+      return
+    }
     if (!allowedTabs.includes(activeTab)) {
       console.warn("⚠️ RESETTING TAB:", {
         activeTab,
@@ -56,12 +60,16 @@ function AppContent() {
   }, [activeTab, allowedTabs, defaultTab])
 
   const handleTabChange = (tab: string) => {
+    if (loading) {
+      console.log("⏳ STILL LOADING, ignoring tab click:", tab)
+      return
+    }
     console.log("TAB CLICK:", tab)
     console.log("ALLOWED TABS:", allowedTabs)
     if (allowedTabs.includes(tab)) {
       setActiveTab(tab)
     } else {
-      console.warn("❌ TAB NOT IN ALLOWED TABS:", tab)
+      console.warn("❌ TAB NOT IN ALLOWED TABS:", tab, "userType:", userType)
     }
   }
 
