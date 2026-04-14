@@ -1,7 +1,9 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react"
-import { supabase } from "@/lib/supabase"
+import { getSupabase } from "@/lib/supabase"
+
+const supabase = getSupabase()
 
 export type UserType = 'student' | 'staff' | 'admin'
 
@@ -50,19 +52,6 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const parts = token.split('.')
-    if (parts.length < 2) return null
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
-    const json = atob(padded)
-    return JSON.parse(json)
-  } catch {
-    return null
-  }
-}
-
 function normalizeUser(rawUser: any): User {
   const role = (rawUser?.role || rawUser?.userType) as UserType
 
@@ -96,71 +85,148 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error: null,
   })
 
-  // Check for stored session on mount
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    const storedToken = localStorage.getItem('auth_token') || localStorage.getItem('token')
+  const clearPersistedAuth = useCallback(() => {
+    localStorage.removeItem('user')
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('token')
+  }, [])
 
-    // Do not restore a session without its JWT token.
-    if (storedUser && !storedToken) {
-      localStorage.removeItem('user')
-      setAuth({ isLoggedIn: false, user: null, loading: false, error: null })
-      return
+  const hydrateUserFromSession = useCallback(async (session: any, expectedRole?: UserType): Promise<User> => {
+    const authEmail = session?.user?.email
+    const token = session?.access_token
+
+    if (!token || !authEmail) {
+      throw new Error('Missing Supabase session data')
     }
 
-    if (storedUser) {
+    const { data: dbUser, error: dbUserError } = await supabase
+      .from('users')
+      .select('id, email, name, role')
+      .eq('email', authEmail)
+      .single()
+
+    if (dbUserError || !dbUser) {
+      throw new Error('Unable to load user profile')
+    }
+
+    if (expectedRole && dbUser.role !== expectedRole) {
+      throw new Error('User type mismatch')
+    }
+
+    let additionalData: Record<string, unknown> = {}
+
+    if (dbUser.role === 'student') {
+      const { data: student } = await supabase
+        .from('students')
+        .select('id, register_number, hostel, room, phone, photo_url')
+        .eq('user_id', dbUser.id)
+        .maybeSingle()
+
+      additionalData = student
+        ? {
+            studentId: student.id,
+            registerNumber: student.register_number,
+            hostel: student.hostel,
+            room: student.room,
+            phone: student.phone,
+            photoUrl: student.photo_url,
+          }
+        : {}
+    } else if (dbUser.role === 'staff') {
+      const { data: staff } = await supabase
+        .from('staff')
+        .select('id')
+        .eq('user_id', dbUser.id)
+        .maybeSingle()
+
+      const { data: assignedCounter } = staff
+        ? await supabase
+            .from('counters')
+            .select('id, name')
+            .eq('assigned_staff_id', staff.id)
+            .maybeSingle()
+        : { data: null }
+
+      additionalData = staff
+        ? {
+            staffId: staff.id,
+            counterId: assignedCounter?.id || null,
+            counterName: assignedCounter?.name || null,
+          }
+        : {}
+    }
+
+    const normalizedUser = normalizeUser({
+      ...dbUser,
+      ...additionalData,
+      userType: dbUser.role,
+    })
+
+    localStorage.setItem('user', JSON.stringify(normalizedUser))
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('token', token)
+
+    return normalizedUser
+  }, [])
+
+  // Hydrate auth state from Supabase session on mount
+  useEffect(() => {
+    let mounted = true
+
+    const restoreFromSupabaseSession = async () => {
+      const { data, error } = await supabase.auth.getSession()
+
+      if (!mounted) return
+
+      if (error || !data.session) {
+        clearPersistedAuth()
+        setAuth({ isLoggedIn: false, user: null, loading: false, error: null })
+        return
+      }
+
       try {
-        const parsedUser = normalizeUser(JSON.parse(storedUser))
-        const payload = storedToken ? decodeJwtPayload(storedToken) : null
+        const normalizedUser = await hydrateUserFromSession(data.session)
+        if (!mounted) return
 
-        // Backfill staff fields for previously cached sessions that predate staffId persistence.
-        if (parsedUser.role === 'staff' && !parsedUser.staffId && payload) {
-          const payloadStaffId = typeof payload.staffId === 'string' ? payload.staffId : undefined
-          const payloadCounterId = typeof payload.counterId === 'string' ? payload.counterId : undefined
-
-          if (payloadStaffId) {
-            parsedUser.staffId = payloadStaffId
-          }
-
-          if (payloadCounterId && !parsedUser.counterId) {
-            parsedUser.counterId = payloadCounterId
-          }
-
-          localStorage.setItem('user', JSON.stringify(parsedUser))
-        }
-
-        setAuth(prev => ({
-          ...prev,
+        setAuth({
           isLoggedIn: true,
-          user: parsedUser
-        }))
-      } catch (err) {
-        localStorage.removeItem('user')
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('token')
+          user: normalizedUser,
+          loading: false,
+          error: null,
+        })
+      } catch {
+        clearPersistedAuth()
+        setAuth({ isLoggedIn: false, user: null, loading: false, error: null })
       }
     }
 
-    // Finish loading after session restore attempt
-    setAuth(prev => ({
-      ...prev,
-      loading: false
-    }))
-  }, [])
+    void restoreFromSupabaseSession()
+
+    return () => {
+      mounted = false
+    }
+  }, [clearPersistedAuth, hydrateUserFromSession])
 
   // Listen to real-time Supabase auth state changes
   useEffect(() => {
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        if (!session) {
-          // Session ended, clear auth immediately
-          localStorage.removeItem('user')
-          localStorage.removeItem('auth_token')
-          localStorage.removeItem('token')
+      (event: string, session: any) => {
+        if (!session || event === 'SIGNED_OUT') {
+          clearPersistedAuth()
           setAuth({ isLoggedIn: false, user: null, loading: false, error: null })
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          // Session active or refreshed, keep current auth state
-          // The login flow already set up the user data
+          return
+        }
+
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+          void (async () => {
+            try {
+              const normalizedUser = await hydrateUserFromSession(session)
+              setAuth({ isLoggedIn: true, user: normalizedUser, loading: false, error: null })
+            } catch {
+              clearPersistedAuth()
+              setAuth({ isLoggedIn: false, user: null, loading: false, error: null })
+            }
+          })()
         }
       }
     )
@@ -168,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       listener?.subscription.unsubscribe()
     }
-  }, [])
+  }, [clearPersistedAuth, hydrateUserFromSession])
 
   const login = useCallback(async (email: string, password: string, userType: UserType) => {
     setAuth(prev => ({ ...prev, loading: true, error: null }))
@@ -181,80 +247,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (authError) {
         throw new Error(authError.message)
       }
-
-      const token = authData.session?.access_token
-      const authEmail = authData.user?.email
-
-      if (!token || !authEmail) {
+      if (!authData.session) {
         throw new Error('Login failed: missing Supabase session data')
       }
 
-      const { data: dbUser, error: dbUserError } = await supabase
-        .from('users')
-        .select('id, email, name, role')
-        .eq('email', authEmail)
-        .single()
-
-      if (dbUserError || !dbUser) {
-        throw new Error('Unable to load user profile')
-      }
-
-      if (dbUser.role !== userType) {
-        throw new Error('User type mismatch')
-      }
-
-      let additionalData: Record<string, unknown> = {}
-
-      if (dbUser.role === 'student') {
-        const { data: student } = await supabase
-          .from('students')
-          .select('id, register_number, hostel, room, phone, photo_url')
-          .eq('user_id', dbUser.id)
-          .maybeSingle()
-
-        additionalData = student
-          ? {
-              studentId: student.id,
-              registerNumber: student.register_number,
-              hostel: student.hostel,
-              room: student.room,
-              phone: student.phone,
-              photoUrl: student.photo_url,
-            }
-          : {}
-      } else if (dbUser.role === 'staff') {
-        const { data: staff } = await supabase
-          .from('staff')
-          .select('id')
-          .eq('user_id', dbUser.id)
-          .maybeSingle()
-
-        const { data: assignedCounter } = staff
-          ? await supabase
-              .from('counters')
-              .select('id, name')
-              .eq('assigned_staff_id', staff.id)
-              .maybeSingle()
-          : { data: null }
-
-        additionalData = staff
-          ? {
-              staffId: staff.id,
-              counterId: assignedCounter?.id || null,
-              counterName: assignedCounter?.name || null,
-            }
-          : {}
-      }
-
-      const normalizedUser = normalizeUser({
-        ...dbUser,
-        ...additionalData,
-        userType: dbUser.role,
-      })
-
-      localStorage.setItem('user', JSON.stringify(normalizedUser))
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('token', token)
+      const normalizedUser = await hydrateUserFromSession(authData.session, userType)
       
       setAuth({
         isLoggedIn: true,
@@ -271,15 +268,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }))
       throw err
     }
-  }, [])
+  }, [hydrateUserFromSession])
 
   const logout = useCallback(() => {
     void supabase.auth.signOut()
-    localStorage.removeItem('user')
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('token')
+    clearPersistedAuth()
     setAuth({ isLoggedIn: false, user: null, loading: false, error: null })
-  }, [])
+  }, [clearPersistedAuth])
 
   const clearError = useCallback(() => {
     setAuth(prev => ({ ...prev, error: null }))

@@ -26,7 +26,7 @@ function AppContent() {
   const { isLoggedIn, user, role, loading } = useAuth()
   const [activeTab, setActiveTab] = useState("dashboard")
 
-  const userType = role || user?.role || user?.userType
+  const userType = role || user?.role || user?.userType || (user as any)?.user_metadata?.role
 
   const allowedTabs = useMemo(() => {
     if (userType !== "student" && userType !== "staff" && userType !== "admin") {

@@ -150,22 +150,13 @@ export async function verifySupabaseAuth(req: Request, allowedRoles?: AppRole[])
   const headerStudentId = req.headers.get('x-student-id')
   const headerStaffId = req.headers.get('x-staff-id')
 
-  let resolvedRole: AppRole | null =
-    headerRole === 'student' || headerRole === 'staff' || headerRole === 'admin'
-      ? headerRole
-      : null
+  let resolvedRole: AppRole | null = null
+  let resolvedUserId: string | null = null
+  let resolvedStudentId: string | undefined = undefined
+  let resolvedStaffId: string | undefined = undefined
 
-  let resolvedUserId: string | null = headerUserId || authData.user.id || null
-  let resolvedStudentId: string | undefined = headerStudentId || undefined
-  let resolvedStaffId: string | undefined = headerStaffId || undefined
-
-  const metaRole = authData.user.app_metadata?.role || authData.user.user_metadata?.role
-  if (!resolvedRole && (metaRole === 'student' || metaRole === 'staff' || metaRole === 'admin')) {
-    resolvedRole = metaRole
-  }
-
-  // Resolve app-specific role and profile ids from DB when client headers/metadata are missing.
-  if ((!resolvedRole || !headerUserId || (resolvedRole === 'student' && !resolvedStudentId) || (resolvedRole === 'staff' && !resolvedStaffId)) && serviceRoleKey && authData.user.email) {
+  // Prefer resolving the app user from Supabase auth email so the backend keys off the DB user row.
+  if (serviceRoleKey && authData.user.email) {
     const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
     const { data: appUser } = await adminClient
@@ -178,11 +169,11 @@ export async function verifySupabaseAuth(req: Request, allowedRoles?: AppRole[])
       resolvedUserId = appUser.id
     }
 
-    if (!resolvedRole && (appUser?.role === 'student' || appUser?.role === 'staff' || appUser?.role === 'admin')) {
+    if (appUser?.role === 'student' || appUser?.role === 'staff' || appUser?.role === 'admin') {
       resolvedRole = appUser.role
     }
 
-    if (resolvedRole === 'student' && !resolvedStudentId && appUser?.id) {
+    if (resolvedRole === 'student' && appUser?.id) {
       const { data: student } = await adminClient
         .from('students')
         .select('id')
@@ -192,7 +183,7 @@ export async function verifySupabaseAuth(req: Request, allowedRoles?: AppRole[])
       resolvedStudentId = student?.id || undefined
     }
 
-    if (resolvedRole === 'staff' && !resolvedStaffId && appUser?.id) {
+    if (resolvedRole === 'staff' && appUser?.id) {
       const { data: staff } = await adminClient
         .from('staff')
         .select('id')
@@ -201,6 +192,29 @@ export async function verifySupabaseAuth(req: Request, allowedRoles?: AppRole[])
 
       resolvedStaffId = staff?.id || undefined
     }
+  }
+
+  if (!resolvedRole) {
+    const metaRole = authData.user.app_metadata?.role || authData.user.user_metadata?.role
+    if (metaRole === 'student' || metaRole === 'staff' || metaRole === 'admin') {
+      resolvedRole = metaRole
+    }
+  }
+
+  if (!resolvedRole && (headerRole === 'student' || headerRole === 'staff' || headerRole === 'admin')) {
+    resolvedRole = headerRole
+  }
+
+  if (!resolvedUserId) {
+    resolvedUserId = headerUserId || authData.user.id || null
+  }
+
+  if (resolvedRole === 'student' && !resolvedStudentId) {
+    resolvedStudentId = headerStudentId || undefined
+  }
+
+  if (resolvedRole === 'staff' && !resolvedStaffId) {
+    resolvedStaffId = headerStaffId || undefined
   }
 
   if (!resolvedRole || !resolvedUserId) {
