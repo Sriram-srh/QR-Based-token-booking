@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createStudent, getActiveStudents } from '@/lib/db-service';
-import { AuthError, requireRole } from '@/lib/auth-middleware';
+import { AuthError, requireRoleAsync } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    requireRole(request, 'admin');
+    await requireRoleAsync(request, 'admin');
     const rows = await getActiveStudents();
 
     const students = rows.map((row: any) => ({
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    requireRole(request, 'admin');
+    await requireRoleAsync(request, 'admin');
     const { name, email, registerNumber, hostel, room, phone, photoUrl } = await request.json();
 
     // Validate required fields

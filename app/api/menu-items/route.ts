@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server"
 import { getSupabaseAdminClient } from "@/lib/db-service"
-import { AuthError, requireRole } from "@/lib/auth-middleware"
+import { AuthError, requireRoleAsync } from "@/lib/auth-middleware"
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    requireRole(request, 'admin')
+    await requireRoleAsync(request, 'admin')
     const supabase = getSupabaseAdminClient()
 
     const { data, error } = await supabase

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
-import { AuthError, verifyAuth } from '@/lib/auth-middleware'
+import { AuthError, verifySupabaseAuth } from '@/lib/auth-middleware'
 
 function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -16,7 +16,7 @@ function getSupabaseAdminClient() {
 // Verify and scan a token
 export async function POST(request: NextRequest) {
   try {
-    verifyAuth(request, ['staff', 'admin'])
+    await verifySupabaseAuth(request, ['staff', 'admin'])
     const supabase = getSupabaseAdminClient()
     const { qrCode, counterId } = await request.json()
 

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateQRCodeDataUrl, generateQRCodeBuffer, createQRCodeId, getTokenExpirationTime } from '@/lib/qr-utils';
 import { createMealToken, logAuditEvent } from '@/lib/db-service';
-import { verifyAuth, AuthError } from '@/lib/auth-middleware';
+import { verifySupabaseAuth, AuthError } from '@/lib/auth-middleware';
 import { normalizeMealType } from '@/lib/meal-type';
 import { z } from 'zod';
 
 export async function POST(request: NextRequest) {
   try {
-    verifyAuth(request, ['admin', 'staff']);
+    await verifySupabaseAuth(request, ['admin', 'staff']);
     const body = await request.json();
     const parsed = z.object({
       studentId: z.string().uuid(),

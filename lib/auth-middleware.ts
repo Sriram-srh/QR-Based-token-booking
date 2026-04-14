@@ -119,6 +119,26 @@ export function requireRoles(req: Request, roles: AppRole[]): AuthUser {
   return user
 }
 
+export async function requireRoleAsync(req: Request, role: AppRole): Promise<AuthUser> {
+  const user = await verifySupabaseAuth(req)
+
+  if (user.role !== role) {
+    throw new AuthError('Forbidden', 403)
+  }
+
+  return user
+}
+
+export async function requireRolesAsync(req: Request, roles: AppRole[]): Promise<AuthUser> {
+  const user = await verifySupabaseAuth(req)
+
+  if (!roles.includes(user.role)) {
+    throw new AuthError('Forbidden', 403)
+  }
+
+  return user
+}
+
 export async function verifySupabaseAuth(req: Request, allowedRoles?: AppRole[]): Promise<AuthUser> {
   const authHeader = req.headers.get('authorization')
   if (!authHeader) {

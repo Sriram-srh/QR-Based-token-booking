@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@/lib/db-service';
-import { AuthError, requireRole } from '@/lib/auth-middleware';
+import { AuthError, requireRoleAsync } from '@/lib/auth-middleware';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 export async function POST(request: NextRequest) {
   try {
-    requireRole(request, 'admin');
+    await requireRoleAsync(request, 'admin');
     const formData = await request.formData();
     const file = formData.get('file');
 

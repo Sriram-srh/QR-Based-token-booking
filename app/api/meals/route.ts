@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server"
 import { getSupabaseAdminClient } from "@/lib/db-service"
-import { AuthError, verifyAuth } from "@/lib/auth-middleware"
+import { AuthError, verifySupabaseAuth } from "@/lib/auth-middleware"
 
 export const dynamic = 'force-dynamic'
 
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = verifyAuth(request, ['student', 'admin'])
+    const user = await verifySupabaseAuth(request, ['student', 'admin'])
     const supabase = getSupabaseAdminClient()
     const view = request.nextUrl.searchParams.get('view') || 'student'
     const nowIso = new Date().toISOString()

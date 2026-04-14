@@ -1,6 +1,6 @@
 import { getSupabaseAdminClient } from "@/lib/db-service"
 import { NextResponse } from "next/server"
-import { verifyAuth, AuthError } from '@/lib/auth-middleware'
+import { verifySupabaseAuth, AuthError } from '@/lib/auth-middleware'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   console.log("\n[POST /api/meals/toggle] request received")
   
   try {
-    verifyAuth(request, ['admin'])
+    await verifySupabaseAuth(request, ['admin'])
     const rawBody = await request.text()
     console.log("Raw body:", rawBody)
 

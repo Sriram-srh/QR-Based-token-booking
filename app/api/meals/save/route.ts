@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/db-service'
-import { AuthError, requireRole } from '@/lib/auth-middleware'
+import { AuthError, requireRoleAsync } from '@/lib/auth-middleware'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +13,7 @@ function isSchemaCacheMissingQuantityLimit(error: any): boolean {
 
 export async function POST(request: Request) {
   try {
-    requireRole(request, 'admin')
+    await requireRoleAsync(request, 'admin')
     const body = await request.json()
     console.log("🔥 SAVE API BODY:", JSON.stringify(body, null, 2))
 

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdminClient } from '@/lib/db-service'
-import { AuthError, requireRole, verifyAuth } from '@/lib/auth-middleware'
+import { AuthError, requireRoleAsync, verifySupabaseAuth } from '@/lib/auth-middleware'
 
 export async function GET(request: NextRequest) {
   try {
-    verifyAuth(request, ['admin', 'staff'])
+    await verifySupabaseAuth(request, ['admin', 'staff'])
     const supabase: any = getSupabaseAdminClient()
 
     const [counterRes, tokenRes] = await Promise.all([
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    requireRole(request, 'admin')
+    await requireRoleAsync(request, 'admin')
     const supabase: any = getSupabaseAdminClient()
     const { name, type, assignedStaffId } = await request.json()
 
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    requireRole(request, 'admin')
+    await requireRoleAsync(request, 'admin')
     const supabase: any = getSupabaseAdminClient()
     const { id, isActive, assignedStaffId } = await request.json()
 
@@ -161,7 +161,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    requireRole(request, 'admin')
+    await requireRoleAsync(request, 'admin')
     const supabase: any = getSupabaseAdminClient()
     const id = request.nextUrl.searchParams.get('id')
 

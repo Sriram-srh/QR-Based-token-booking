@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { getSupabaseAdminClient } from '@/lib/db-service';
-import { requireRole, AuthError } from '@/lib/auth-middleware';
+import { requireRoleAsync, AuthError } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    requireRole(request, 'admin');
+    await requireRoleAsync(request, 'admin');
     const supabase: any = getSupabaseAdminClient();
 
     const [staffRes, counterRes] = await Promise.all([
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    requireRole(request, 'admin');
+    await requireRoleAsync(request, 'admin');
     const supabase: any = getSupabaseAdminClient();
     const { name, email, employeeNumber } = await request.json();
 
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    requireRole(request, 'admin');
+    await requireRoleAsync(request, 'admin');
     const supabase: any = getSupabaseAdminClient();
 
     const { staffId, counterId } = await request.json();
