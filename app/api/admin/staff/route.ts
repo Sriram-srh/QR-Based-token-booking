@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
 import { getSupabaseAdminClient } from '@/lib/db-service';
 import { requireRoleAsync, AuthError } from '@/lib/auth-middleware';
 
@@ -133,21 +132,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
     const supabase: any = getSupabaseAdminClient();
-    const { name, email, employeeNumber } = await request.json();
+    const { name, email, employeeNumber, password } = await request.json();
 
     if (!name || !email || !employeeNumber) {
       return NextResponse.json({ error: 'name, email and employeeNumber are required' }, { status: 400 });
     }
 
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    const rawPassword = typeof password === 'string' && password.length >= 8 ? password : 'Default@123';
+
+    const { data: authCreated, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password: rawPassword,
+      email_confirm: true,
+      app_metadata: { role: 'staff' },
+      user_metadata: { role: 'staff', name },
+    });
+
+    if (authError || !authCreated?.user?.id) {
+      return NextResponse.json({ error: authError?.message || 'Failed to create auth user' }, { status: 500 });
+    }
+
+    const authUserId = authCreated.user.id;
 
     const { data: userData, error: userError } = await supabase
       .from('users')
       .insert([
         {
+          id: authUserId,
           email,
           name,
-          password_hash: hashedPassword,
           role: 'staff',
           is_active: true,
         },
@@ -156,6 +169,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (userError || !userData) {
+      await supabase.auth.admin.deleteUser(authUserId);
       console.error('DB ERROR:', userError);
       return NextResponse.json({ error: userError?.message || 'Failed to create user' }, { status: 500 });
     }
@@ -173,6 +187,7 @@ export async function POST(request: NextRequest) {
 
     if (staffError || !staffData) {
       await supabase.from('users').delete().eq('id', userData.id);
+      await supabase.auth.admin.deleteUser(authUserId);
       console.error('DB ERROR:', staffError);
       return NextResponse.json({ error: staffError?.message || 'Failed to create staff' }, { status: 500 });
     }

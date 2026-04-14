@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import bcrypt from 'bcryptjs';
 import { normalizeMealType } from '@/lib/meal-type';
 
 let supabaseClient: ReturnType<typeof createClient> | null = null;
@@ -428,17 +427,31 @@ export async function createStudent(
   try {
     const supabase = getSupabaseAdminClient();
 
-    // Hash the default password
-    const hashedPassword = await bcrypt.hash('password123', 10);
+    const defaultPassword = 'Default@123';
 
-    // Create user account
+    const { data: authCreated, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password: defaultPassword,
+      email_confirm: true,
+      app_metadata: { role: 'student' },
+      user_metadata: { role: 'student', name },
+    });
+
+    if (authError || !authCreated?.user?.id) {
+      console.error('[v0] Error creating auth user:', authError);
+      return { success: false, error: authError?.message || 'Failed to create auth user' };
+    }
+
+    const authUserId = authCreated.user.id;
+
+    // Create user profile row linked to auth.users id.
     const { data: userData, error: userError } = await (supabase
       .from('users') as any)
       .insert([
         {
+          id: authUserId,
           email,
           name,
-          password_hash: hashedPassword,
           role: 'student',
           is_active: true,
         },
@@ -447,6 +460,7 @@ export async function createStudent(
       .single();
 
     if (userError || !userData) {
+      await supabase.auth.admin.deleteUser(authUserId);
       console.error('[v0] Error creating user:', userError);
       return { success: false, error: userError?.message || 'Failed to create user' };
     }
@@ -470,6 +484,7 @@ export async function createStudent(
     if (studentError || !studentData) {
       // Rollback user creation if student creation fails
       await supabase.from('users').delete().eq('id', userData.id);
+      await supabase.auth.admin.deleteUser(authUserId);
       console.error('[v0] Error creating student record:', studentError);
       return { success: false, error: studentError?.message || 'Failed to create student record' };
     }
