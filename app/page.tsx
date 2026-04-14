@@ -45,13 +45,23 @@ function AppContent() {
 
   useEffect(() => {
     if (!allowedTabs.includes(activeTab)) {
+      console.warn("⚠️ RESETTING TAB:", {
+        activeTab,
+        allowedTabs,
+        userType,
+        defaultTab
+      })
       setActiveTab(defaultTab)
     }
   }, [activeTab, allowedTabs, defaultTab])
 
   const handleTabChange = (tab: string) => {
+    console.log("TAB CLICK:", tab)
+    console.log("ALLOWED TABS:", allowedTabs)
     if (allowedTabs.includes(tab)) {
       setActiveTab(tab)
+    } else {
+      console.warn("❌ TAB NOT IN ALLOWED TABS:", tab)
     }
   }
 
