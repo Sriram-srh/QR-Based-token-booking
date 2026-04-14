@@ -51,29 +51,37 @@ function AppContent() {
     if (!allowedTabs.includes(activeTab)) {
       console.warn("⚠️ RESETTING TAB:", {
         activeTab,
+        activeTabType: typeof activeTab,
         allowedTabs,
         userType,
-        defaultTab
+        defaultTab,
+        defaultTabType: typeof defaultTab
       })
       setActiveTab(defaultTab)
     }
   }, [activeTab, allowedTabs, defaultTab])
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = (tab: any) => {
     if (loading) {
       console.log("⏳ STILL LOADING, ignoring tab click:", tab)
       return
     }
-    console.log("TAB CLICK:", tab, "TYPE:", typeof tab)
+    
+    // Extract safeTab from string or object
+    const safeTab: string | null = typeof tab === "string" ? tab : (tab?.value || tab?.id || null)
+    
+    console.log("TAB CLICK:", tab, "TYPE:", typeof tab, "SAFE_TAB:", safeTab)
     console.log("ALLOWED TABS:", allowedTabs)
-    if (typeof tab !== "string") {
-      console.error("❌ ERROR: tab parameter is not a string!", { tab, type: typeof tab })
+    
+    if (!safeTab || typeof safeTab !== "string") {
+      console.error("❌ INVALID TAB: cannot extract string from:", { tab, type: typeof tab })
       return
     }
-    if (allowedTabs.includes(tab)) {
-      setActiveTab(tab)
+    
+    if (allowedTabs.includes(safeTab)) {
+      setActiveTab(safeTab)
     } else {
-      console.warn("❌ TAB NOT IN ALLOWED TABS:", tab, "userType:", userType)
+      console.warn("❌ TAB NOT IN ALLOWED TABS:", safeTab, "userType:", userType)
     }
   }
 
