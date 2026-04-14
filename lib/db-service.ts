@@ -444,33 +444,13 @@ export async function createStudent(
 
     const authUserId = authCreated.user.id;
 
-    // Create user profile row linked to auth.users id.
-    const { data: userData, error: userError } = await (supabase
-      .from('users') as any)
-      .insert([
-        {
-          id: authUserId,
-          email,
-          name,
-          role: 'student',
-          is_active: true,
-        },
-      ])
-      .select()
-      .single();
-
-    if (userError || !userData) {
-      await supabase.auth.admin.deleteUser(authUserId);
-      console.error('[v0] Error creating user:', userError);
-      return { success: false, error: userError?.message || 'Failed to create user' };
-    }
-
-    // Create student record
+    // Trigger will auto-create users row from auth.users user_metadata
+    // Just create student record linked to auth user
     const { data: studentData, error: studentError } = await (supabase
       .from('students') as any)
       .insert([
         {
-          user_id: userData.id,
+          user_id: authUserId,
           register_number: registerNumber,
           hostel,
           room,
@@ -482,8 +462,7 @@ export async function createStudent(
       .single();
 
     if (studentError || !studentData) {
-      // Rollback user creation if student creation fails
-      await supabase.from('users').delete().eq('id', userData.id);
+      // Rollback auth creation if student creation fails
       await supabase.auth.admin.deleteUser(authUserId);
       console.error('[v0] Error creating student record:', studentError);
       return { success: false, error: studentError?.message || 'Failed to create student record' };
@@ -493,7 +472,7 @@ export async function createStudent(
       success: true,
       student: {
         id: studentData.id,
-        user_id: userData.id,
+        user_id: authUserId,
         name,
         email,
         registerNumber,

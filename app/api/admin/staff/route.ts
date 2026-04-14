@@ -154,31 +154,13 @@ export async function POST(request: NextRequest) {
 
     const authUserId = authCreated.user.id;
 
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .insert([
-        {
-          id: authUserId,
-          email,
-          name,
-          role: 'staff',
-          is_active: true,
-        },
-      ])
-      .select('id, name, email')
-      .single();
-
-    if (userError || !userData) {
-      await supabase.auth.admin.deleteUser(authUserId);
-      console.error('DB ERROR:', userError);
-      return NextResponse.json({ error: userError?.message || 'Failed to create user' }, { status: 500 });
-    }
-
+    // Trigger will auto-create users row with metadata from auth.users
+    // Just wait a moment for trigger execution, then create staff record
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
       .insert([
         {
-          user_id: userData.id,
+          user_id: authUserId,
           employee_number: employeeNumber,
         },
       ])
@@ -186,10 +168,20 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (staffError || !staffData) {
-      await supabase.from('users').delete().eq('id', userData.id);
       await supabase.auth.admin.deleteUser(authUserId);
       console.error('DB ERROR:', staffError);
       return NextResponse.json({ error: staffError?.message || 'Failed to create staff' }, { status: 500 });
+    }
+
+    // Fetch the auto-created user data from public.users
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, name, email')
+      .eq('id', authUserId)
+      .single();
+
+    if (userError || !userData) {
+      console.warn('Users row not yet synced by trigger, but auth user created successfully');
     }
 
     return NextResponse.json(
@@ -197,9 +189,9 @@ export async function POST(request: NextRequest) {
         success: true,
         staff: {
           id: staffData.id,
-          userId: userData.id,
-          name: userData.name,
-          email: userData.email,
+          userId: authUserId,
+          name: userData?.name || 'Staff Member',
+          email: email,
           employeeNumber: staffData.employee_number,
           assignedCounter: null,
         },
