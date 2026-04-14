@@ -31,7 +31,7 @@ import {
   UserCog,
   ArrowRight,
 } from "lucide-react"
-import { clearAuthSession, getAuthHeaders, isAuthFailureStatus, parseJsonSafe } from "@/lib/client-auth"
+import { clearAuthSession, getAuthHeadersAsync, isAuthFailureStatus, parseJsonSafe } from "@/lib/client-auth"
 
 export function StaffAccounts() {
   const [staff, setStaff] = useState<StaffMember[]>([])
@@ -46,7 +46,7 @@ export function StaffAccounts() {
   const loadStaff = async () => {
     try {
       setLoading(true)
-      const headers = { ...getAuthHeaders() }
+      const headers = await getAuthHeadersAsync()
       if (!headers.Authorization) {
         setStaff([])
         setCounters([])
@@ -112,9 +112,10 @@ export function StaffAccounts() {
     e.preventDefault()
     try {
       setCreating(true)
+      const headers = await getAuthHeadersAsync()
       const response = await fetch('/api/admin/staff', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({
           name: newStaff.name,
           email: newStaff.email,
@@ -146,9 +147,10 @@ export function StaffAccounts() {
   const assignCounter = async (staffId: string, counterId: string | null) => {
     try {
       setAssigning(staffId)
+      const headers = await getAuthHeadersAsync()
       const response = await fetch('/api/admin/staff', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ staffId, counterId }),
       })
 

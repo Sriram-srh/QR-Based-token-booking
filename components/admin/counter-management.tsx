@@ -32,7 +32,7 @@ import {
   ShieldAlert,
   Trash2,
 } from "lucide-react"
-import { getAuthHeaders } from "@/lib/client-auth"
+import { getAuthHeadersAsync } from "@/lib/client-auth"
 
 type StaffOption = {
   id: string
@@ -55,10 +55,11 @@ export function CounterManagement() {
   const [newCounterStaff, setNewCounterStaff] = useState("none")
 
   const fetchCounters = async () => {
+    const authHeaders = await getAuthHeadersAsync()
     const response = await fetch('/api/counters', {
       cache: 'no-store',
       headers: {
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
     })
 
@@ -81,10 +82,11 @@ export function CounterManagement() {
   }
 
   const fetchStaff = async () => {
+    const authHeaders = await getAuthHeadersAsync()
     const response = await fetch('/api/admin/staff', {
       cache: 'no-store',
       headers: {
-        ...getAuthHeaders(),
+        ...authHeaders,
       },
     })
 
@@ -123,11 +125,12 @@ export function CounterManagement() {
 
     try {
       setBusyCounterId(id)
+      const authHeaders = await getAuthHeadersAsync()
       const response = await fetch('/api/counters', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders(),
+          ...authHeaders,
         },
         body: JSON.stringify({ id, isActive: !counter.isActive }),
       })
@@ -147,11 +150,12 @@ export function CounterManagement() {
 
     try {
       setAddingCounter(true)
+      const authHeaders = await getAuthHeadersAsync()
       const response = await fetch('/api/counters', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders(),
+          ...authHeaders,
         },
         body: JSON.stringify({
           name: newCounterName.trim(),
@@ -177,10 +181,11 @@ export function CounterManagement() {
   const handleDeleteCounter = async (id: string) => {
     try {
       setBusyCounterId(id)
+      const authHeaders = await getAuthHeadersAsync()
       const response = await fetch(`/api/counters?id=${id}`, {
         method: 'DELETE',
         headers: {
-          ...getAuthHeaders(),
+          ...authHeaders,
         },
       })
 

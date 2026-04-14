@@ -32,7 +32,7 @@ import {
   Clock,
   Download,
 } from "lucide-react"
-import { getAuthHeaders } from "@/lib/client-auth"
+import { getAuthHeadersAsync } from "@/lib/client-auth"
 
 type AuditLogRow = {
   id: string
@@ -75,11 +75,10 @@ export function AuditLogs() {
     const loadLogs = async () => {
       try {
         setLoading(true)
+        const headers = await getAuthHeadersAsync()
         const response = await fetch('/api/admin/audit-logs', {
           cache: 'no-store',
-          headers: {
-            ...getAuthHeaders(),
-          },
+          headers,
         })
         if (!response.ok) {
           throw new Error('Failed to load audit logs')

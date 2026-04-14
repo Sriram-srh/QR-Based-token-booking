@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { clearAuthSession, getAuthHeaders, isAuthFailureStatus, parseJsonSafe } from "@/lib/client-auth"
+import { clearAuthSession, getAuthHeadersAsync, isAuthFailureStatus, parseJsonSafe } from "@/lib/client-auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -73,7 +73,7 @@ export function StudentAccounts() {
   const loadStudents = async () => {
     try {
       setLoadingStudents(true)
-      const headers = { ...getAuthHeaders() }
+      const headers = await getAuthHeadersAsync()
       if (!headers.Authorization) {
         setStudents([])
         return
@@ -131,13 +131,14 @@ export function StudentAccounts() {
     try {
       setUploadingPhoto(true)
       setPhotoError(null)
+      const headers = await getAuthHeadersAsync()
 
       const formData = new FormData()
       formData.append('file', file)
 
       const response = await fetch('/api/admin/upload-photo', {
         method: 'POST',
-        headers: { ...getAuthHeaders() },
+        headers: { ...headers },
         body: formData,
       })
 
@@ -168,9 +169,10 @@ export function StudentAccounts() {
 
     try {
       setCreating(true)
+      const headers = await getAuthHeadersAsync()
       const response = await fetch('/api/admin/students', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({
           name: newStudent.name,
           email: newStudent.email,

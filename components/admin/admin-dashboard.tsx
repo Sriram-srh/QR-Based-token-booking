@@ -19,7 +19,7 @@ import {
   ArrowRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { getAuthHeaders } from "@/lib/client-auth"
+import { getAuthHeadersAsync } from "@/lib/client-auth"
 
 type DashboardMeal = {
   id: string
@@ -58,10 +58,11 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (tab: string) => vo
   useEffect(() => {
     const load = async () => {
       try {
+        const headers = await getAuthHeadersAsync()
         const [mealsRes, staffRes, logsRes] = await Promise.all([
-          fetch('/api/meals?view=admin', { cache: 'no-store', headers: { ...getAuthHeaders() } }),
-          fetch('/api/admin/staff', { cache: 'no-store', headers: { ...getAuthHeaders() } }),
-          fetch('/api/admin/audit-logs', { cache: 'no-store', headers: { ...getAuthHeaders() } }),
+          fetch('/api/meals?view=admin', { cache: 'no-store', headers }),
+          fetch('/api/admin/staff', { cache: 'no-store', headers }),
+          fetch('/api/admin/audit-logs', { cache: 'no-store', headers }),
         ])
 
         if (mealsRes.ok) {

@@ -5,7 +5,7 @@ import { getMealCost } from "@/lib/mock-data"
 import type { Meal, MenuItem } from "@/lib/mock-data"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { clearAuthSession, getAuthHeaders, isAuthFailureStatus, parseJsonSafe } from "@/lib/client-auth"
+import { clearAuthSession, getAuthHeadersAsync, isAuthFailureStatus, parseJsonSafe } from "@/lib/client-auth"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
@@ -153,7 +153,7 @@ export function MealManagement() {
 
   const fetchMeals = async () => {
     try {
-      const headers = { ...getAuthHeaders() }
+      const headers = await getAuthHeadersAsync()
       if (!headers.Authorization) {
         return
       }
@@ -184,7 +184,7 @@ export function MealManagement() {
 
   const fetchMenuLibrary = async () => {
     try {
-      const headers = { ...getAuthHeaders() }
+      const headers = await getAuthHeadersAsync()
       if (!headers.Authorization) {
         return
       }
@@ -266,7 +266,7 @@ export function MealManagement() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...getAuthHeaders(),
+        ...(await getAuthHeadersAsync()),
       },
       body: JSON.stringify(payload),
       cache: 'no-store',
@@ -285,7 +285,7 @@ export function MealManagement() {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
-          ...getAuthHeaders(),
+          ...(await getAuthHeadersAsync()),
         },
         body: JSON.stringify({ is_open: payload.isOpen }),
         cache: 'no-store',
@@ -403,7 +403,7 @@ export function MealManagement() {
       
       const response = await fetch('/api/meals/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeadersAsync()) },
         body: JSON.stringify(payload)
       })
 
