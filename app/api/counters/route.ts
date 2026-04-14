@@ -4,22 +4,39 @@ import { AuthError, requireRoleAsync, verifySupabaseAuth } from '@/lib/auth-midd
 
 export async function GET(request: NextRequest) {
   try {
-    await verifySupabaseAuth(request, ['admin', 'staff'])
+    const auth = await verifySupabaseAuth(request, ['admin', 'staff'])
+    console.log('[api/counters] Auth resolved:', { userId: auth.userId, role: auth.role })
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('[api/counters] Missing SUPABASE_SERVICE_ROLE_KEY')
+      return NextResponse.json({ error: 'Server misconfigured: missing SUPABASE_SERVICE_ROLE_KEY' }, { status: 500 })
+    }
+
     const supabase: any = getSupabaseAdminClient()
 
-    const [counterRes, tokenRes] = await Promise.all([
-      supabase
-        .from('counters')
-        .select('id, name, type, is_active, assigned_staff_id')
-        .order('name', { ascending: true }),
-      supabase
-        .from('meal_tokens')
-        .select('counter_id')
-        .eq('status', 'USED'),
-    ])
+    let { data, error } = await supabase
+      .from('counters')
+      .select('id, name, type, is_active, assigned_staff_id')
+      .order('name', { ascending: true })
 
-    const { data, error } = counterRes
-    const { data: tokenRows, error: tokenError } = tokenRes
+    if (error && /assigned_staff_id/i.test(String(error.message || ''))) {
+      const fallbackCounters = await supabase
+        .from('counters')
+        .select('id, name, type, is_active')
+        .order('name', { ascending: true })
+      data = fallbackCounters.data
+      error = fallbackCounters.error
+    }
+
+    let { data: tokenRows, error: tokenError } = await supabase
+      .from('meal_tokens')
+      .select('counter_id')
+      .eq('status', 'USED')
+
+    if (tokenError && /counter_id/i.test(String(tokenError.message || ''))) {
+      tokenRows = []
+      tokenError = null
+    }
 
     if (error) {
       console.error('[api/counters] DB ERROR:', error)

@@ -15,6 +15,16 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const user = await verifySupabaseAuth(request, ['student', 'admin'])
+    console.log('[api/meals] Auth resolved:', { userId: user.userId, role: user.role })
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('[api/meals] Missing SUPABASE_SERVICE_ROLE_KEY')
+      return Response.json(
+        { success: false, error: 'Server misconfigured: missing SUPABASE_SERVICE_ROLE_KEY' },
+        { status: 500 }
+      )
+    }
+
     const supabase = getSupabaseAdminClient()
     const view = request.nextUrl.searchParams.get('view') || 'student'
     const nowIso = new Date().toISOString()
@@ -97,6 +107,29 @@ export async function GET(request: NextRequest) {
       const fallbackResult = await fallbackQuery
       meals = fallbackResult.data
       error = fallbackResult.error
+    }
+
+    // Last-resort fallback: relation/table shape can vary across environments.
+    if (error && /meal_menu_items|menu_items/i.test(String(error.message || ''))) {
+      let plainQuery = supabase
+        .from('meals')
+        .select('*')
+        .gte('meal_date', todayStr)
+        .order('meal_date', { ascending: true })
+
+      if (view === 'admin') {
+        plainQuery = plainQuery.lte('meal_date', maxDateStr)
+      }
+
+      if (view === 'student') {
+        plainQuery = plainQuery
+          .eq('is_open', true)
+          .gt('booking_end', nowIso)
+      }
+
+      const plainResult = await plainQuery
+      meals = plainResult.data
+      error = plainResult.error
     }
 
     if (error) {

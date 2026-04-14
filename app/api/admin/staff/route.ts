@@ -5,24 +5,69 @@ import { requireRoleAsync, AuthError } from '@/lib/auth-middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRoleAsync(request, 'admin');
+    const auth = await requireRoleAsync(request, 'admin');
+    console.log('[api/admin/staff] Auth resolved:', { userId: auth.userId, role: auth.role });
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('[api/admin/staff] Missing SUPABASE_SERVICE_ROLE_KEY');
+      return NextResponse.json({ error: 'Server misconfigured: missing SUPABASE_SERVICE_ROLE_KEY' }, { status: 500 });
+    }
+
     const supabase: any = getSupabaseAdminClient();
 
-    const [staffRes, counterRes] = await Promise.all([
-      supabase
+    let staffRes = await supabase
+      .from('staff')
+      .select(`
+        id,
+        employee_number,
+        created_at,
+        users:users(id, name, email, is_active)
+      `)
+      .order('created_at', { ascending: false });
+
+    // Fallback for environments where nested users relation is unavailable in PostgREST cache.
+    if (staffRes.error && /users/i.test(String(staffRes.error.message || ''))) {
+      const plainStaffRes = await supabase
         .from('staff')
-        .select(`
-          id,
-          employee_number,
-          created_at,
-          users:users(id, name, email, is_active)
-        `)
-        .order('created_at', { ascending: false }),
-      supabase
+        .select('id, employee_number, created_at, user_id')
+        .order('created_at', { ascending: false });
+
+      if (!plainStaffRes.error && Array.isArray(plainStaffRes.data)) {
+        const userIds = plainStaffRes.data.map((s: any) => s.user_id).filter(Boolean);
+        let userMap: Record<string, any> = {};
+
+        if (userIds.length > 0) {
+          const usersRes = await supabase
+            .from('users')
+            .select('id, name, email, is_active')
+            .in('id', userIds);
+
+          if (!usersRes.error) {
+            userMap = Object.fromEntries((usersRes.data || []).map((u: any) => [u.id, u]));
+          }
+        }
+
+        staffRes = {
+          data: plainStaffRes.data.map((s: any) => ({
+            ...s,
+            users: s.user_id ? userMap[s.user_id] || null : null,
+          })),
+          error: null,
+        };
+      }
+    }
+
+    let counterRes = await supabase
+      .from('counters')
+      .select('id, name, type, is_active, assigned_staff_id')
+      .order('name', { ascending: true });
+
+    if (counterRes.error && /assigned_staff_id/i.test(String(counterRes.error.message || ''))) {
+      counterRes = await supabase
         .from('counters')
-        .select('id, name, type, is_active, assigned_staff_id')
-        .order('name', { ascending: true }),
-    ]);
+        .select('id, name, type, is_active')
+        .order('name', { ascending: true });
+    }
 
     if (staffRes.error) {
       console.error('DB ERROR:', staffRes.error);
