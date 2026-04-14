@@ -69,6 +69,7 @@ export function StaffAccounts() {
         console.error('[v0] Failed to load staff accounts:', {
           status: response.status,
           error: errorBody?.error || 'Unknown error',
+          details: errorBody,
         })
         setStaff([])
         setCounters([])
@@ -95,7 +96,7 @@ export function StaffAccounts() {
       setStaff(mappedStaff)
       setCounters(mappedCounters)
     } catch (error) {
-      console.error('[v0] Failed to load staff accounts:', error)
+      console.error('[v0] Failed to load staff accounts:', JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2))
       setStaff([])
       setCounters([])
     } finally {

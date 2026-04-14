@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error('[v0] Staff GET error:', error);
+    console.error('[v0] Staff GET error:', JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2));
     return NextResponse.json({ error: 'Failed to fetch staff accounts' }, { status: 500 });
   }
 }
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error('[v0] Staff POST error:', error);
+    console.error('[v0] Staff POST error:', JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2));
     return NextResponse.json({ error: 'Failed to create staff account' }, { status: 500 });
   }
 }
@@ -254,7 +254,7 @@ export async function PATCH(request: NextRequest) {
     if (error instanceof AuthError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
-    console.error('[v0] Staff PATCH error:', error);
+    console.error('[v0] Staff PATCH error:', JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2));
     return NextResponse.json({ error: 'Failed to update counter assignment' }, { status: 500 });
   }
 }

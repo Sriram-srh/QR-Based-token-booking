@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (error) {
-      console.error('[api/meals] Query error:', error)
+      console.error('[api/meals] Query error:', JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2))
       return Response.json(
         { success: false, error: error.message },
         { status: 500 }
@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
     if (err instanceof AuthError) {
       return Response.json({ success: false, error: err.message }, { status: err.status })
     }
-    console.error('[api/meals] Exception:', err)
+    console.error('[api/meals] Exception:', JSON.stringify(err, Object.getOwnPropertyNames(err || {}), 2))
     return Response.json(
       { success: false, error: err instanceof Error ? err.message : 'Unknown error' },
       { status: 500 }
