@@ -5,6 +5,16 @@ import { AuthError, requireRoleAsync, verifySupabaseAuth } from '@/lib/auth-midd
 export async function GET(request: NextRequest) {
   try {
     const auth = await verifySupabaseAuth(request, ['admin', 'staff'])
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    const { userId, role } = auth
+    if (!userId) {
+      return NextResponse.json({ error: 'Invalid user' }, { status: 400 })
+    }
+    if (!role || (role !== 'admin' && role !== 'staff')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
     console.log('[api/counters] Auth resolved:', { userId: auth.userId, role: auth.role })
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -78,7 +88,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireRoleAsync(request, 'admin')
+    const auth = await requireRoleAsync(request, 'admin')
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!auth.userId) {
+      return NextResponse.json({ error: 'Invalid user' }, { status: 400 })
+    }
+    if (!auth.role || auth.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
     const supabase: any = getSupabaseAdminClient()
     const { name, type, assignedStaffId } = await request.json()
 
@@ -125,7 +144,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requireRoleAsync(request, 'admin')
+    const auth = await requireRoleAsync(request, 'admin')
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!auth.userId) {
+      return NextResponse.json({ error: 'Invalid user' }, { status: 400 })
+    }
+    if (!auth.role || auth.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
     const supabase: any = getSupabaseAdminClient()
     const { id, isActive, assignedStaffId } = await request.json()
 
@@ -178,7 +206,16 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    await requireRoleAsync(request, 'admin')
+    const auth = await requireRoleAsync(request, 'admin')
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!auth.userId) {
+      return NextResponse.json({ error: 'Invalid user' }, { status: 400 })
+    }
+    if (!auth.role || auth.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
     const supabase: any = getSupabaseAdminClient()
     const id = request.nextUrl.searchParams.get('id')
 

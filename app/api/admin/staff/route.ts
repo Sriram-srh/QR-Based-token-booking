@@ -6,6 +6,15 @@ import { requireRoleAsync, AuthError } from '@/lib/auth-middleware';
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireRoleAsync(request, 'admin');
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!auth.userId) {
+      return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
+    }
+    if (!auth.role || auth.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     console.log('[api/admin/staff] Auth resolved:', { userId: auth.userId, role: auth.role });
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -113,7 +122,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireRoleAsync(request, 'admin');
+    const auth = await requireRoleAsync(request, 'admin');
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!auth.userId) {
+      return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
+    }
+    if (!auth.role || auth.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const supabase: any = getSupabaseAdminClient();
     const { name, email, employeeNumber } = await request.json();
 
@@ -184,7 +202,16 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    await requireRoleAsync(request, 'admin');
+    const auth = await requireRoleAsync(request, 'admin');
+    if (!auth) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!auth.userId) {
+      return NextResponse.json({ error: 'Invalid user' }, { status: 400 });
+    }
+    if (!auth.role || auth.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
     const supabase: any = getSupabaseAdminClient();
 
     const { staffId, counterId } = await request.json();

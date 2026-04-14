@@ -15,6 +15,15 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   try {
     const user = await verifySupabaseAuth(request, ['student', 'admin'])
+    if (!user) {
+      return Response.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+    }
+    if (!user.userId) {
+      return Response.json({ success: false, error: 'Invalid user' }, { status: 400 })
+    }
+    if (!user.role || (user.role !== 'student' && user.role !== 'admin')) {
+      return Response.json({ success: false, error: 'Forbidden' }, { status: 403 })
+    }
     console.log('[api/meals] Auth resolved:', { userId: user.userId, role: user.role })
 
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
