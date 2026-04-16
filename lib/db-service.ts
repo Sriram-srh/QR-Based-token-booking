@@ -81,6 +81,7 @@ function generateBackupCode(): string {
 
 export interface QRScanResult {
   success: boolean;
+  reason?: 'INVALID' | 'INVALID_QR_FORMAT' | 'ALREADY_USED' | 'EXPIRED' | 'CANCELLED' | 'INTERNAL_ERROR';
   tokenId?: string;
   studentId?: string;
   mealType?: string;
@@ -293,11 +294,20 @@ export async function validateAndScanToken(
   counterId: string
 ): Promise<QRScanResult> {
   try {
+    if (!String(qrCode || '').trim()) {
+      return {
+        success: false,
+        reason: 'INVALID_QR_FORMAT',
+        error: 'Invalid token payload',
+      };
+    }
+
     const token = await getMealTokenByQRCode(qrCode);
 
     if (!token) {
       return {
         success: false,
+        reason: 'INVALID',
         error: 'Token not found',
       };
     }
@@ -306,6 +316,7 @@ export async function validateAndScanToken(
     if (token.status === 'USED') {
       return {
         success: false,
+        reason: 'ALREADY_USED',
         error: 'Token already scanned',
         tokenId: token.id,
         studentId: token.student_id,
@@ -320,6 +331,7 @@ export async function validateAndScanToken(
     if (Number.isFinite(expiry) && now > expiry) {
       return {
         success: false,
+        reason: 'EXPIRED',
         error: 'Token expired',
         tokenId: token.id,
         studentId: token.student_id,
@@ -332,6 +344,7 @@ export async function validateAndScanToken(
     if (token.status === 'CANCELLED') {
       return {
         success: false,
+        reason: 'CANCELLED',
         error: 'Token cancelled',
         tokenId: token.id,
         studentId: token.student_id,
@@ -348,6 +361,7 @@ export async function validateAndScanToken(
       if (latestToken?.status === 'USED') {
         return {
           success: false,
+          reason: 'ALREADY_USED',
           error: 'Token already scanned',
           tokenId: latestToken.id,
           studentId: latestToken.student_id,
@@ -358,6 +372,7 @@ export async function validateAndScanToken(
 
       return {
         success: false,
+        reason: 'INTERNAL_ERROR',
         error: 'Failed to update token status',
       };
     }
@@ -373,6 +388,7 @@ export async function validateAndScanToken(
     console.error('[v0] Exception validating and scanning token:', err);
     return {
       success: false,
+      reason: 'INTERNAL_ERROR',
       error: 'An error occurred during validation',
     };
   }

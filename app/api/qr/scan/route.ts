@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateAndScanToken, getStudentInfo, logAuditEvent } from '@/lib/db-service';
 import { AuthError, verifySupabaseAuth } from '@/lib/auth-middleware';
 
+function mapFailureReasonToStatus(reason?: string): number {
+  if (reason === 'INVALID_QR_FORMAT' || reason === 'INVALID') return 400;
+  if (reason === 'ALREADY_USED') return 409;
+  if (reason === 'EXPIRED' || reason === 'CANCELLED') return 410;
+  return 500;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await verifySupabaseAuth(request, ['staff', 'admin']);
@@ -43,13 +50,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
+          reason: scanResult.reason || 'INTERNAL_ERROR',
           error: scanResult.error,
           tokenId: scanResult.tokenId,
           studentId: scanResult.studentId,
           mealType: scanResult.mealType,
           status: scanResult.status,
         },
-        { status: 400 }
+        { status: mapFailureReasonToStatus(scanResult.reason) }
       );
     }
 

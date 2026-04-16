@@ -20,11 +20,19 @@ export async function POST(request: NextRequest) {
     await verifySupabaseAuth(request, ['staff', 'admin'])
     const supabase = getSupabaseAdminClient()
     const { qrCode, counterId } = await request.json()
-    const { tokenLookup } = extractTokenLookupFromQR(String(qrCode || ''))
+    const rawQr = String(qrCode || '')
+    const { tokenLookup } = extractTokenLookupFromQR(rawQr)
 
-    if (!tokenLookup || !counterId) {
+    if (!counterId) {
       return NextResponse.json(
-        { error: 'QR code and counter ID required' },
+        { error: 'Counter ID required', reason: 'INVALID_REQUEST' },
+        { status: 400 }
+      )
+    }
+
+    if (!rawQr.trim() || !tokenLookup) {
+      return NextResponse.json(
+        { error: 'Invalid token payload', reason: 'INVALID_QR_FORMAT' },
         { status: 400 }
       )
     }
@@ -51,8 +59,8 @@ export async function POST(request: NextRequest) {
         console.error('DB ERROR:', tokenError)
       }
       return NextResponse.json(
-        { error: 'Invalid QR code' },
-        { status: 404 }
+        { error: 'Invalid token', reason: 'INVALID' },
+        { status: 400 }
       )
     }
 
@@ -61,11 +69,45 @@ export async function POST(request: NextRequest) {
     const nowMs = now.getTime()
     const expiresAtMs = new Date(token.expires_at).getTime()
 
+    if (token.status === 'USED') {
+      return NextResponse.json(
+        {
+          error: 'Token already scanned',
+          reason: 'ALREADY_USED',
+          status: token.status
+        },
+        { status: 409 }
+      )
+    }
+
+    if (token.status === 'EXPIRED') {
+      return NextResponse.json(
+        {
+          error: 'Token has expired',
+          reason: 'EXPIRED',
+          status: token.status
+        },
+        { status: 410 }
+      )
+    }
+
+    if (token.status === 'CANCELLED') {
+      return NextResponse.json(
+        {
+          error: 'Token cancelled',
+          reason: 'CANCELLED',
+          status: token.status
+        },
+        { status: 410 }
+      )
+    }
+
     if (token.status !== 'VALID') {
       return NextResponse.json(
-        { 
-          error: `Token is ${token.status}`,
-          status: token.status 
+        {
+          error: `Unsupported token state ${token.status}`,
+          reason: 'INVALID',
+          status: token.status
         },
         { status: 400 }
       )
@@ -84,8 +126,8 @@ export async function POST(request: NextRequest) {
       }
 
       return NextResponse.json(
-        { error: 'Token has expired' },
-        { status: 400 }
+        { error: 'Token has expired', reason: 'EXPIRED', status: 'EXPIRED' },
+        { status: 410 }
       )
     }
 
@@ -106,7 +148,7 @@ export async function POST(request: NextRequest) {
       // Conditional update can fail when token was consumed in a concurrent scan.
       if (String(updateError.code || '').toUpperCase() === 'PGRST116') {
         return NextResponse.json(
-          { error: 'Token already scanned', status: 'USED' },
+          { error: 'Token already scanned', reason: 'ALREADY_USED', status: 'USED' },
           { status: 409 }
         )
       }
