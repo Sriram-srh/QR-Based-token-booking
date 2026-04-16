@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateAndScanToken, getStudentInfo, logAuditEvent } from '@/lib/db-service';
-import { AuthError, verifyAuth } from '@/lib/auth-middleware';
+import { AuthError, verifySupabaseAuth } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
   try {
-    const user = verifyAuth(request, ['staff', 'admin']);
+    const user = await verifySupabaseAuth(request, ['staff', 'admin']);
     const body = await request.json();
     const { qrCode, counterId, staffId } = body;
 
