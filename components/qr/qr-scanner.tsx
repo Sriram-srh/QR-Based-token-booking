@@ -41,12 +41,33 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scanLoopActiveRef = useRef(false);
+  const scanLockRef = useRef(false);
+  const lastScannedCodeRef = useRef<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [manualQRCode, setManualQRCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSecureContextReady, setIsSecureContextReady] = useState(true);
+
+  const stopScanner = () => {
+    scanLoopActiveRef.current = false;
+
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
+      tracks.forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+
+    setScanning(false);
+  };
+
+  const resetForNextScan = () => {
+    scanLockRef.current = false;
+    lastScannedCodeRef.current = null;
+    setLastScannedCode(null);
+    setScanResult(null);
+  };
 
   useEffect(() => {
     setIsSecureContextReady(typeof window !== 'undefined' ? window.isSecureContext : true);
@@ -101,7 +122,8 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
               const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
               const code = jsQR(imageData.data, imageData.width, imageData.height);
 
-              if (code && code.data !== lastScannedCode) {
+              if (code && !scanLockRef.current && code.data !== lastScannedCodeRef.current) {
+                lastScannedCodeRef.current = code.data;
                 setLastScannedCode(code.data);
                 await handleQRCodeDetected(code.data);
               }
@@ -124,19 +146,25 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
     startCamera();
 
     return () => {
-      scanLoopActiveRef.current = false;
-      if (videoRef.current && videoRef.current.srcObject) {
-        const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-        tracks.forEach((track) => track.stop());
-      }
+      stopScanner();
     };
-  }, [scanning, lastScannedCode]);
+  }, [scanning]);
 
   const handleQRCodeDetected = async (qrCode: string) => {
-    if (!counterId) {
-      toast.error('Select a counter before scanning.');
+    if (scanLockRef.current) {
       return;
     }
+
+    scanLockRef.current = true;
+
+    if (!counterId) {
+      toast.error('Select a counter before scanning.');
+      scanLockRef.current = false;
+      return;
+    }
+
+    // Stop camera immediately to avoid duplicate callback processing from subsequent frames.
+    stopScanner();
 
     setLoading(true);
     try {
@@ -175,6 +203,7 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
       return;
     }
 
+    resetForNextScan();
     await handleQRCodeDetected(manualQRCode);
     setManualQRCode('');
   };
@@ -223,6 +252,20 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
           ) : (
             <Button onClick={() => setScanning(true)} className="w-full">
               Start Camera
+            </Button>
+          )}
+
+          {!scanning && (
+            <Button
+              onClick={() => {
+                resetForNextScan();
+                setScanning(true);
+              }}
+              variant="outline"
+              className="w-full"
+              disabled={loading}
+            >
+              Scan Next
             </Button>
           )}
 
@@ -330,8 +373,7 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
               variant="outline"
               className="w-full"
               onClick={() => {
-                setScanResult(null)
-                setLastScannedCode(null)
+                resetForNextScan()
               }}
             >
               Close
