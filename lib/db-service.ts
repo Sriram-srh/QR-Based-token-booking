@@ -86,6 +86,7 @@ export interface QRScanResult {
   studentId?: string;
   mealType?: string;
   status?: string;
+  expiresAt?: string;
   error?: string;
 }
 
@@ -322,6 +323,7 @@ export async function validateAndScanToken(
         studentId: token.student_id,
         mealType: token.meal_type,
         status: token.status,
+        expiresAt: token.expires_at,
       };
     }
 
@@ -337,6 +339,7 @@ export async function validateAndScanToken(
         studentId: token.student_id,
         mealType: token.meal_type,
         status: 'EXPIRED',
+        expiresAt: token.expires_at,
       };
     }
 
@@ -350,6 +353,7 @@ export async function validateAndScanToken(
         studentId: token.student_id,
         mealType: token.meal_type,
         status: token.status,
+        expiresAt: token.expires_at,
       };
     }
 
@@ -367,6 +371,7 @@ export async function validateAndScanToken(
           studentId: latestToken.student_id,
           mealType: latestToken.meal_type,
           status: latestToken.status,
+          expiresAt: latestToken.expires_at,
         };
       }
 
@@ -383,6 +388,7 @@ export async function validateAndScanToken(
       studentId: scannedToken.student_id,
       mealType: scannedToken.meal_type,
       status: scannedToken.status,
+      expiresAt: scannedToken.expires_at,
     };
   } catch (err) {
     console.error('[v0] Exception validating and scanning token:', err);

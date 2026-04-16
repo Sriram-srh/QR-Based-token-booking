@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { getAuthHeadersAsync, parseJsonSafe } from '@/lib/client-auth';
 import { toast } from 'sonner';
-import { AlertCircle, CheckCircle2, ScanLine, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Flashlight, ScanLine, XCircle } from 'lucide-react';
 
 interface QRScannerProps {
   counterId: string;
@@ -26,6 +27,7 @@ interface ScanResult {
     studentId: string;
     mealType: string;
     status: string;
+    expiresAt?: string;
   };
   student?: {
     id: string;
@@ -43,6 +45,7 @@ type ResultState = 'valid' | 'used' | 'invalid';
 export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
   const scanLoopActiveRef = useRef(false);
   const scanLockRef = useRef(false);
   const lastScannedCodeRef = useRef<string | null>(null);
@@ -53,15 +56,22 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
   const [loading, setLoading] = useState(false);
   const [isSecureContextReady, setIsSecureContextReady] = useState(true);
   const [scannedAt, setScannedAt] = useState<string | null>(null);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [autoScanNext, setAutoScanNext] = useState(true);
 
   const stopScanner = () => {
     scanLoopActiveRef.current = false;
+    setTorchOn(false);
+    setTorchSupported(false);
 
     if (videoRef.current && videoRef.current.srcObject) {
       const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
       tracks.forEach((track) => track.stop());
       videoRef.current.srcObject = null;
     }
+
+    videoTrackRef.current = null;
 
     setScanning(false);
   };
@@ -124,6 +134,59 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
     return 'invalid';
   }, [scanResult]);
 
+  const tokenExpiryInfo = useMemo(() => {
+    const expiresAtRaw = scanResult?.token?.expiresAt;
+    if (!expiresAtRaw) {
+      return null;
+    }
+
+    const expiresAt = new Date(expiresAtRaw);
+    if (!Number.isFinite(expiresAt.getTime())) {
+      return null;
+    }
+
+    const remainingMs = expiresAt.getTime() - Date.now();
+    const minutes = Math.max(0, Math.ceil(remainingMs / 60000));
+
+    return {
+      expiresAt,
+      minutes,
+      expired: remainingMs <= 0,
+    };
+  }, [scanResult]);
+
+  useEffect(() => {
+    if (!autoScanNext || !scanResult) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      resetForNextScan();
+      setScanning(true);
+    }, 2500);
+
+    return () => window.clearTimeout(timeout);
+  }, [autoScanNext, scanResult]);
+
+  const handleTorchToggle = async () => {
+    const track = videoTrackRef.current as any;
+
+    if (!track || !torchSupported) {
+      return;
+    }
+
+    const nextTorchState = !torchOn;
+
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: nextTorchState }],
+      });
+      setTorchOn(nextTorchState);
+    } catch {
+      toast.error('Torch control is not available on this device.');
+    }
+  };
+
   useEffect(() => {
     setIsSecureContextReady(typeof window !== 'undefined' ? window.isSecureContext : true);
   }, []);
@@ -156,6 +219,14 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
 
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+        }
+
+        const [videoTrack] = stream.getVideoTracks();
+        videoTrackRef.current = videoTrack || null;
+
+        if (videoTrack && typeof (videoTrack as any).getCapabilities === 'function') {
+          const capabilities = (videoTrack as any).getCapabilities();
+          setTorchSupported(Boolean(capabilities?.torch));
         }
 
         // Start scanning loop
@@ -336,6 +407,27 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
             </Button>
           </div>
 
+          <div className="grid grid-cols-2 gap-3 items-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleTorchToggle}
+              disabled={!scanning || !torchSupported}
+            >
+              <Flashlight className="h-4 w-4 mr-2" />
+              {torchOn ? 'Torch Off' : 'Torch On'}
+            </Button>
+            <div className="flex items-center justify-end gap-2">
+              <Label htmlFor="auto-scan-next" className="text-sm text-muted-foreground">Auto next</Label>
+              <Switch
+                id="auto-scan-next"
+                checked={autoScanNext}
+                onCheckedChange={setAutoScanNext}
+              />
+            </div>
+          </div>
+
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t"></div>
@@ -402,6 +494,20 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="text-center">
+              <p
+                className={
+                  resultState === 'valid'
+                    ? 'text-3xl font-extrabold text-success'
+                    : resultState === 'used'
+                      ? 'text-3xl font-extrabold text-warning'
+                      : 'text-3xl font-extrabold text-destructive'
+                }
+              >
+                {resultState === 'valid' ? 'VALID' : resultState === 'used' ? 'USED' : 'INVALID'}
+              </p>
+            </div>
+
             {!scanResult.success && resultState === 'invalid' && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -445,9 +551,14 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
             )}
 
             {scannedAt && (
-              <p className="text-xs text-muted-foreground">
-                Scanned at {new Date(scannedAt).toLocaleTimeString()}
-              </p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>Scanned at {new Date(scannedAt).toLocaleTimeString()}</p>
+                {tokenExpiryInfo && (
+                  <p>
+                    Expires {tokenExpiryInfo.expired ? 'now' : `in ${tokenExpiryInfo.minutes} min`} ({tokenExpiryInfo.expiresAt.toLocaleTimeString()})
+                  </p>
+                )}
+              </div>
             )}
 
             <Button

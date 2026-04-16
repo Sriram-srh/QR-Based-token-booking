@@ -84,6 +84,7 @@ export async function POST(request: NextRequest) {
         studentId: scanResult.studentId,
         mealType: scanResult.mealType,
         status: scanResult.status,
+        expiresAt: scanResult.expiresAt,
       },
       student: studentInfo ? {
         id: studentInfo.id,
