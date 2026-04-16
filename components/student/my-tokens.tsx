@@ -26,7 +26,6 @@ import {
   Moon,
   X,
   User,
-  Hash,
   Ticket,
 } from "lucide-react"
 
@@ -40,6 +39,7 @@ type TokenItem = {
   createdAt: Date
   expiresAt: Date
   qrCode: string
+  qrCodeImage?: string | null
   backupCode?: string
   bookedItems: Array<{ name: string; quantity: number; cost: number }>
   counter?: string
@@ -105,73 +105,42 @@ function CountdownTimer({ expiresAt }: { expiresAt: Date }) {
   )
 }
 
-// Simple SVG QR code generator (deterministic pattern from token ID)
 function QRCodeDisplay({
-  tokenId,
+  qrImage,
   hideQR,
   watermarkText,
 }: {
-  tokenId: string
+  qrImage?: string | null
   hideQR?: boolean
   watermarkText?: string
 }) {
-  const size = 180
-  const moduleCount = 21
-  const moduleSize = size / moduleCount
-
-  const seed = tokenId.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  const modules: boolean[][] = []
-
-  for (let r = 0; r < moduleCount; r++) {
-    modules[r] = []
-    for (let c = 0; c < moduleCount; c++) {
-      const inTopLeft = r < 7 && c < 7
-      const inTopRight = r < 7 && c >= moduleCount - 7
-      const inBottomLeft = r >= moduleCount - 7 && c < 7
-      if (inTopLeft || inTopRight || inBottomLeft) {
-        const inOuter = r === 0 || c === 0 || r === 6 || c === 6 ||
-          (inTopRight && (c === moduleCount - 7 || c === moduleCount - 1)) ||
-          (inBottomLeft && (r === moduleCount - 7 || r === moduleCount - 1))
-        const inInner = (
-          (inTopLeft && r >= 2 && r <= 4 && c >= 2 && c <= 4) ||
-          (inTopRight && r >= 2 && r <= 4 && c >= moduleCount - 5 && c <= moduleCount - 3) ||
-          (inBottomLeft && r >= moduleCount - 5 && r <= moduleCount - 3 && c >= 2 && c <= 4)
-        )
-        modules[r][c] = inOuter || inInner
-      } else {
-        modules[r][c] = ((seed * (r + 1) * (c + 1) + r * 7 + c * 13) % 3) === 0
-      }
-    }
-  }
-
   if (hideQR) {
     return (
-      <div className="mx-auto w-[180px] h-[180px] rounded-lg border border-destructive/30 bg-destructive/5 flex items-center justify-center p-3 text-center">
+      <div className="mx-auto w-[300px] h-[300px] rounded-lg border border-destructive/30 bg-destructive/5 flex items-center justify-center p-3 text-center">
         <p className="text-sm text-destructive font-medium">QR hidden for security</p>
+      </div>
+    )
+  }
+
+  if (!qrImage) {
+    return (
+      <div className="mx-auto w-[300px] h-[300px] rounded-lg border border-border bg-muted/40 flex items-center justify-center p-3 text-center">
+        <p className="text-sm text-muted-foreground">QR image unavailable for this token</p>
       </div>
     )
   }
 
   return (
     <div className="relative w-fit mx-auto select-none" aria-label="secured-qr-code">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto">
-        <rect width={size} height={size} fill="white" rx="8" />
-        {modules.map((row, r) =>
-          row.map((filled, c) =>
-            filled ? (
-              <rect
-                key={`${r}-${c}`}
-                x={c * moduleSize}
-                y={r * moduleSize}
-                width={moduleSize}
-                height={moduleSize}
-                fill="#1a1a2e"
-                rx={1}
-              />
-            ) : null
-          )
-        )}
-      </svg>
+      <img
+        src={qrImage}
+        alt="Meal token QR"
+        width={300}
+        height={300}
+        className="mx-auto h-[300px] w-[300px] rounded-lg border border-border bg-white object-contain"
+        loading="eager"
+        draggable={false}
+      />
       {watermarkText && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="text-[10px] font-semibold text-foreground/20 rotate-[-20deg] tracking-wide">
@@ -265,6 +234,7 @@ export function MyTokens() {
         createdAt: new Date(token.created_at || Date.now()),
         expiresAt: new Date(token.expires_at || `${token.meal_date || new Date().toISOString()}T23:59:59.999Z`),
         qrCode: token.qr_code,
+        qrCodeImage: token.qr_code_image || null,
         backupCode: token.backupCode || token.backup_code || undefined,
         bookedItems: [],
         counter: token.counter_id || undefined,
@@ -443,7 +413,7 @@ export function MyTokens() {
                     </div>
 
                     <QRCodeDisplay
-                      tokenId={token.id}
+                      qrImage={token.qrCodeImage}
                       hideQR={hideSensitiveQr}
                       watermarkText={user?.email || student?.registerNumber || token.id.slice(0, 8)}
                     />
@@ -646,7 +616,7 @@ export function MyTokens() {
               </div>
 
               <QRCodeDisplay
-                tokenId={expandedToken}
+                qrImage={allTokens.find(t => t.id === expandedToken)?.qrCodeImage || null}
                 hideQR={hideSensitiveQr}
                 watermarkText={user?.email || student?.registerNumber || expandedToken.slice(0, 8)}
               />

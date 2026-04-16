@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { AuthError, verifySupabaseAuth } from '@/lib/auth-middleware'
+import { extractTokenLookupFromQR } from '@/lib/qr-utils'
 
 function getSupabaseAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -19,8 +20,9 @@ export async function POST(request: NextRequest) {
     await verifySupabaseAuth(request, ['staff', 'admin'])
     const supabase = getSupabaseAdminClient()
     const { qrCode, counterId } = await request.json()
+    const { tokenLookup } = extractTokenLookupFromQR(String(qrCode || ''))
 
-    if (!qrCode || !counterId) {
+    if (!tokenLookup || !counterId) {
       return NextResponse.json(
         { error: 'QR code and counter ID required' },
         { status: 400 }
@@ -31,14 +33,14 @@ export async function POST(request: NextRequest) {
     let { data: token, error: tokenError } = await supabase
       .from('meal_tokens')
       .select('*')
-      .or(`qr_code.eq.${qrCode},backup_code.eq.${qrCode}`)
+      .or(`qr_code.eq.${tokenLookup},backup_code.eq.${tokenLookup}`)
       .single()
 
     if (tokenError && String(tokenError.message || '').toLowerCase().includes('backup_code')) {
       const fallback = await supabase
         .from('meal_tokens')
         .select('*')
-        .eq('qr_code', qrCode)
+        .eq('qr_code', tokenLookup)
         .single()
       token = fallback.data
       tokenError = fallback.error
@@ -96,10 +98,18 @@ export async function POST(request: NextRequest) {
         counter_id: counterId
       })
       .eq('id', token.id)
+      .eq('status', 'VALID')
       .select()
       .single()
 
     if (updateError) {
+      // Conditional update can fail when token was consumed in a concurrent scan.
+      if (String(updateError.code || '').toUpperCase() === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Token already scanned', status: 'USED' },
+          { status: 409 }
+        )
+      }
       console.error('DB ERROR:', updateError)
       return NextResponse.json({ error: updateError.message }, { status: 500 })
     }

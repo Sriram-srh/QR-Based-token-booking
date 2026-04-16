@@ -3,9 +3,24 @@ import QRCode from 'qrcode';
 export interface QRGenerationData {
   tokenId: string;
   studentId?: string;
+  email?: string;
   mealType?: string;
   date?: string;
   timestamp?: number;
+}
+
+export interface ParsedQRLookup {
+  tokenLookup: string;
+  email?: string;
+  raw: string;
+}
+
+function buildStructuredPayload(data: QRGenerationData): string {
+  return JSON.stringify({
+    // Compact keys keep payload small and scanner-friendly.
+    t: data.tokenId,
+    e: data.email,
+  });
 }
 
 /**
@@ -13,7 +28,7 @@ export interface QRGenerationData {
  */
 export async function generateQRCodeDataUrl(data: QRGenerationData): Promise<string> {
   try {
-    const jsonString = JSON.stringify({ tokenId: data.tokenId });
+    const jsonString = buildStructuredPayload(data);
     const qrDataUrl = await QRCode.toDataURL(jsonString, {
       errorCorrectionLevel: 'H',
       type: 'image/png',
@@ -36,7 +51,7 @@ export async function generateQRCodeDataUrl(data: QRGenerationData): Promise<str
  */
 export async function generateQRCodeBuffer(data: QRGenerationData): Promise<Buffer> {
   try {
-    const jsonString = JSON.stringify({ tokenId: data.tokenId });
+    const jsonString = buildStructuredPayload(data);
     const buffer = await QRCode.toBuffer(jsonString, {
       errorCorrectionLevel: 'H',
       type: 'png',
@@ -78,9 +93,10 @@ export function validateQRData(data: unknown): data is QRGenerationData {
   }
 
   const qrData = data as Record<string, unknown>;
+  const token = typeof qrData.t === 'string' ? qrData.t : qrData.tokenId;
 
   return (
-    typeof qrData.tokenId === 'string'
+    typeof token === 'string' && token.trim().length > 0
   );
 }
 
@@ -91,13 +107,42 @@ export function parseQRCodeString(qrString: string): QRGenerationData | null {
   try {
     const data = JSON.parse(qrString);
     if (validateQRData(data)) {
-      return data;
+      const record = data as unknown as Record<string, unknown>;
+      return {
+        tokenId: String(record.t ?? record.tokenId),
+        email: typeof record.e === 'string' ? record.e : undefined,
+      };
     }
     return null;
-  } catch (error) {
-    console.error('[v0] Error parsing QR code string:', error);
+  } catch {
     return null;
   }
+}
+
+/**
+ * Resolve QR scanner text into a token lookup value.
+ * Supports JSON payloads ({ t, e } or legacy { tokenId }) and raw backup/token strings.
+ */
+export function extractTokenLookupFromQR(qrString: string): ParsedQRLookup {
+  const raw = String(qrString || '').trim();
+
+  if (!raw) {
+    return { tokenLookup: '', raw };
+  }
+
+  const parsed = parseQRCodeString(raw);
+  if (parsed?.tokenId) {
+    return {
+      tokenLookup: parsed.tokenId,
+      email: parsed.email,
+      raw,
+    };
+  }
+
+  return {
+    tokenLookup: raw,
+    raw,
+  };
 }
 
 /**

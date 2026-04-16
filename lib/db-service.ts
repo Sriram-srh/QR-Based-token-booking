@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { normalizeMealType } from '@/lib/meal-type';
+import { extractTokenLookupFromQR } from '@/lib/qr-utils';
 
 let supabaseClient: ReturnType<typeof createClient> | null = null;
 let adminClient: ReturnType<typeof createClient> | null = null;
@@ -164,18 +165,23 @@ export async function createMealToken(
 export async function getMealTokenByQRCode(qrCode: string): Promise<MealToken | null> {
   try {
     const supabase = getSupabaseClient();
+    const { tokenLookup } = extractTokenLookupFromQR(qrCode);
+
+    if (!tokenLookup) {
+      return null;
+    }
 
     let { data, error } = await supabase
       .from('meal_tokens')
       .select('*')
-      .or(`qr_code.eq.${qrCode},backup_code.eq.${qrCode}`)
+      .or(`qr_code.eq.${tokenLookup},backup_code.eq.${tokenLookup}`)
       .single();
 
     if (error && String(error.message || '').toLowerCase().includes('backup_code')) {
       const fallback = await supabase
         .from('meal_tokens')
         .select('*')
-        .eq('qr_code', qrCode)
+        .eq('qr_code', tokenLookup)
         .single();
 
       data = fallback.data;
@@ -233,10 +239,14 @@ export async function markTokenAsScanned(
         counter_id: counterId,
       })
       .eq('id', tokenId)
+      .eq('status', 'VALID')
       .select()
       .single();
 
     if (error) {
+      if (String((error as any)?.code || '').toUpperCase() === 'PGRST116') {
+        return null;
+      }
       console.error('[v0] Error marking token as scanned:', error);
       return null;
     }
@@ -334,6 +344,18 @@ export async function validateAndScanToken(
     const scannedToken = await markTokenAsScanned(token.id, counterId);
 
     if (!scannedToken) {
+      const latestToken = await getMealTokenById(token.id);
+      if (latestToken?.status === 'USED') {
+        return {
+          success: false,
+          error: 'Token already scanned',
+          tokenId: latestToken.id,
+          studentId: latestToken.student_id,
+          mealType: latestToken.meal_type,
+          status: latestToken.status,
+        };
+      }
+
       return {
         success: false,
         error: 'Failed to update token status',
