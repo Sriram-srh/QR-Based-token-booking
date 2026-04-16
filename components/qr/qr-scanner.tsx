@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { getAuthHeadersAsync, parseJsonSafe } from '@/lib/client-auth';
 import { toast } from 'sonner';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ScanLine, XCircle } from 'lucide-react';
 
 interface QRScannerProps {
   counterId: string;
@@ -20,6 +20,7 @@ interface QRScannerProps {
 
 interface ScanResult {
   success: boolean;
+  reason?: string;
   token?: {
     id: string;
     studentId: string;
@@ -37,6 +38,8 @@ interface ScanResult {
   error?: string;
 }
 
+type ResultState = 'valid' | 'used' | 'invalid';
+
 export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -49,6 +52,7 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
   const [manualQRCode, setManualQRCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSecureContextReady, setIsSecureContextReady] = useState(true);
+  const [scannedAt, setScannedAt] = useState<string | null>(null);
 
   const stopScanner = () => {
     scanLoopActiveRef.current = false;
@@ -67,7 +71,58 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
     lastScannedCodeRef.current = null;
     setLastScannedCode(null);
     setScanResult(null);
+    setScannedAt(null);
   };
+
+  const triggerFeedback = (state: ResultState) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+
+    if (AudioCtx) {
+      try {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        const tone = state === 'valid' ? 980 : state === 'used' ? 620 : 420;
+        osc.frequency.value = tone;
+        osc.type = 'sine';
+
+        gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.16);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.16);
+      } catch {
+        // No-op: audio feedback is optional and should never block scanning UX.
+      }
+    }
+
+    const vibrateMs = state === 'valid' ? 120 : 220;
+    navigator.vibrate?.(vibrateMs);
+  };
+
+  const resultState = useMemo<ResultState | null>(() => {
+    if (!scanResult) {
+      return null;
+    }
+
+    if (scanResult.success) {
+      return 'valid';
+    }
+
+    if (scanResult.reason === 'ALREADY_USED' || scanResult.token?.status === 'USED') {
+      return 'used';
+    }
+
+    return 'invalid';
+  }, [scanResult]);
 
   useEffect(() => {
     setIsSecureContextReady(typeof window !== 'undefined' ? window.isSecureContext : true);
@@ -183,10 +238,15 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
 
       if (response.ok) {
         setScanResult(data);
+        setScannedAt(new Date().toISOString());
+        triggerFeedback('valid');
         toast.success(`Meal verified for ${data.student?.name}`);
         onScanSuccess?.(data);
       } else {
         setScanResult(data);
+        setScannedAt(new Date().toISOString());
+        const state = data?.reason === 'ALREADY_USED' || data?.status === 'USED' ? 'used' : 'invalid';
+        triggerFeedback(state);
         toast.error(data.error || 'Failed to verify QR code');
       }
     } catch (error) {
@@ -225,49 +285,56 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
           <CardDescription>Scan meal tokens or enter code manually</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {scanning ? (
-            <div className="space-y-4">
-              <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+          <div className="relative w-full max-w-md mx-auto">
+            <div className="relative w-full h-[260px] bg-black rounded-xl overflow-hidden border border-border/50">
+              {scanning ? (
                 <video
                   ref={videoRef}
                   autoPlay
                   playsInline
                   className="w-full h-full object-cover"
                 />
-                <canvas ref={canvasRef} className="hidden" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-64 h-64 border-2 border-green-500 rounded-lg opacity-75"></div>
+              ) : (
+                <div className="h-full w-full flex flex-col items-center justify-center text-white/80 gap-2">
+                  <ScanLine className="h-8 w-8" />
+                  <p className="text-sm">Scanner is ready</p>
                 </div>
-              </div>
+              )}
+              <canvas ref={canvasRef} className="hidden" />
 
-              <Button
-                onClick={() => setScanning(false)}
-                variant="outline"
-                className="w-full"
-                disabled={loading}
-              >
-                Stop Camera
-              </Button>
+              {scanning && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-64 h-64 border-[3px] border-white rounded-xl relative shadow-[0_0_0_9999px_rgba(0,0,0,0.26)]">
+                    <div className="absolute left-0 w-full h-1 bg-success animate-scan-line" />
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            <Button onClick={() => setScanning(true)} className="w-full">
-              Start Camera
-            </Button>
-          )}
+          </div>
 
-          {!scanning && (
+          <div className="grid grid-cols-2 gap-3">
+            {!scanning ? (
+              <Button onClick={() => setScanning(true)} className="w-full" disabled={loading}>
+                Start Scan
+              </Button>
+            ) : (
+              <Button onClick={stopScanner} variant="outline" className="w-full" disabled={loading}>
+                Stop
+              </Button>
+            )}
+
             <Button
               onClick={() => {
                 resetForNextScan();
                 setScanning(true);
               }}
-              variant="outline"
+              variant={scanResult ? 'default' : 'secondary'}
               className="w-full"
               disabled={loading}
             >
               Scan Next
             </Button>
-          )}
+          </div>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -305,24 +372,37 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
       </Card>
 
       {scanResult && (
-        <Card className={scanResult.success ? 'border-green-500' : 'border-red-500'}>
+        <Card
+          className={
+            resultState === 'valid'
+              ? 'border-success/70 bg-success/5'
+              : resultState === 'used'
+                ? 'border-warning/70 bg-warning/10'
+                : 'border-destructive/70 bg-destructive/5'
+          }
+        >
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              {scanResult.success ? (
+            <CardTitle className="flex items-center gap-2 text-lg">
+              {resultState === 'valid' ? (
                 <>
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <CheckCircle2 className="w-5 h-5 text-success" />
                   Token Verified
+                </>
+              ) : resultState === 'used' ? (
+                <>
+                  <AlertCircle className="w-5 h-5 text-warning" />
+                  Already Used
                 </>
               ) : (
                 <>
-                  <AlertCircle className="w-5 h-5 text-red-500" />
-                  Verification Failed
+                  <XCircle className="w-5 h-5 text-destructive" />
+                  Invalid Token
                 </>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!scanResult.success && (
+            {!scanResult.success && resultState === 'invalid' && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{scanResult.error}</AlertDescription>
@@ -353,12 +433,7 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
               <div className="space-y-2">
                 <h4 className="font-semibold">Student Details</h4>
                 <div className="space-y-1 text-sm">
-                  <p>
-                    <strong>Name:</strong> {scanResult.student.name}
-                  </p>
-                  <p>
-                    <strong>Register Number:</strong> {scanResult.student.registerNumber}
-                  </p>
+                  <p className="text-muted-foreground">{scanResult.student.name} • {scanResult.student.registerNumber}</p>
                   <p>
                     <strong>Hostel:</strong> {scanResult.student.hostel || 'N/A'}
                   </p>
@@ -367,6 +442,12 @@ export function QRScanner({ counterId, staffId, onScanSuccess }: QRScannerProps)
                   </p>
                 </div>
               </div>
+            )}
+
+            {scannedAt && (
+              <p className="text-xs text-muted-foreground">
+                Scanned at {new Date(scannedAt).toLocaleTimeString()}
+              </p>
             )}
 
             <Button

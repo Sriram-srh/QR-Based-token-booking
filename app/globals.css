@@ -132,8 +132,23 @@
   }
 }
 
+@keyframes scannerLine {
+  0% {
+    top: 0%;
+    opacity: 0.95;
+  }
+  100% {
+    top: calc(100% - 4px);
+    opacity: 0.75;
+  }
+}
+
 @layer utilities {
   .animate-fadeInUp {
     animation: fadeInUp 0.6s ease-out forwards;
+  }
+
+  .animate-scan-line {
+    animation: scannerLine 2s linear infinite;
   }
 }
