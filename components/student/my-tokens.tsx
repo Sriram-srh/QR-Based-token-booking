@@ -108,11 +108,9 @@ function CountdownTimer({ expiresAt }: { expiresAt: Date }) {
 function QRCodeDisplay({
   qrImage,
   hideQR,
-  watermarkText,
 }: {
   qrImage?: string | null
   hideQR?: boolean
-  watermarkText?: string
 }) {
   if (hideQR) {
     return (
@@ -141,13 +139,6 @@ function QRCodeDisplay({
         loading="eager"
         draggable={false}
       />
-      {watermarkText && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-[10px] font-semibold text-foreground/20 rotate-[-20deg] tracking-wide">
-            {watermarkText}
-          </span>
-        </div>
-      )}
     </div>
   )
 }
@@ -415,7 +406,6 @@ export function MyTokens() {
                     <QRCodeDisplay
                       qrImage={token.qrCodeImage}
                       hideQR={hideSensitiveQr}
-                      watermarkText={user?.email || student?.registerNumber || token.id.slice(0, 8)}
                     />
                     {token.backupCode && (
                       <div className="mt-3 text-center space-y-1.5" onClick={(e) => e.stopPropagation()}>
@@ -618,7 +608,6 @@ export function MyTokens() {
               <QRCodeDisplay
                 qrImage={allTokens.find(t => t.id === expandedToken)?.qrCodeImage || null}
                 hideQR={hideSensitiveQr}
-                watermarkText={user?.email || student?.registerNumber || expandedToken.slice(0, 8)}
               />
               {(() => {
                 const token = allTokens.find(t => t.id === expandedToken)
