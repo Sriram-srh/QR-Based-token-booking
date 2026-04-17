@@ -139,11 +139,17 @@ export function LoginPage() {
 
       <div className="w-full md:w-1/2 flex items-center justify-center px-4">
         <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-6 shadow-xl text-white">
-          <h1 className="text-2xl font-bold text-center">MKCE Hostel Queue System</h1>
-          <p className="text-sm text-center text-gray-300 mt-1">A QR-Based Smart Meal Token Platform</p>
+          <h1 className="text-2xl font-bold text-center">
+            MKCE Hostel Queue System
+          </h1>
+          <p className="text-sm text-center text-gray-300 mt-1">
+            A QR-Based Smart Meal Token Platform
+          </p>
 
           <div className="flex justify-center mt-2">
-            <span className="text-xs bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">MKCE Project</span>
+            <span className="inline-block mt-2 text-xs bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">
+              🎓 MKCE Project
+            </span>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4 mt-5">
