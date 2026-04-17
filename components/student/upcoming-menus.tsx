@@ -89,7 +89,9 @@ export function UpcomingMenus() {
       }
 
       const rows = Array.isArray(data?.data) ? data.data : []
-      setUpcomingMeals(rows.map((row: any) => normalizeMeal(row)))
+      const mappedMeals = rows.map((row: any) => normalizeMeal(row))
+      const today = toLocalDateString(new Date())
+      setUpcomingMeals(mappedMeals.filter((meal: Meal) => meal.date > today))
     } catch (error) {
       console.error('[upcoming-menus] Failed to load meals:', error)
     } finally {
