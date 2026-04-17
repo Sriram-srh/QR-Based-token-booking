@@ -38,9 +38,6 @@ const roleTheme: Record<
     primary: string
     glowDark: string
     glowLight: string
-    text: string
-    ring: string
-    soft: string
     icon: typeof GraduationCap
     label: string
   }
@@ -49,9 +46,6 @@ const roleTheme: Record<
     primary: "from-blue-500 to-indigo-600",
     glowDark: "rgba(59,130,246,0.6)",
     glowLight: "rgba(59,130,246,0.25)",
-    text: "text-blue-400",
-    ring: "ring-blue-500/30",
-    soft: "bg-blue-500/10",
     icon: GraduationCap,
     label: "student",
   },
@@ -59,9 +53,6 @@ const roleTheme: Record<
     primary: "from-emerald-500 to-green-600",
     glowDark: "rgba(16,185,129,0.6)",
     glowLight: "rgba(16,185,129,0.25)",
-    text: "text-emerald-400",
-    ring: "ring-emerald-500/30",
-    soft: "bg-emerald-500/10",
     icon: Wrench,
     label: "staff",
   },
@@ -69,9 +60,6 @@ const roleTheme: Record<
     primary: "from-orange-500 to-red-500",
     glowDark: "rgba(249,115,22,0.6)",
     glowLight: "rgba(249,115,22,0.25)",
-    text: "text-orange-400",
-    ring: "ring-orange-500/30",
-    soft: "bg-orange-500/10",
     icon: Shield,
     label: "admin",
   },
@@ -81,9 +69,9 @@ function RoleVisual({ role, isDark }: { role: UserType; isDark: boolean }) {
   const { icon: Icon, primary, glowDark, glowLight, label } = roleTheme[role]
 
   return (
-    <div className="hidden md:flex w-1/2 items-center justify-center relative">
+    <div className="hidden md:flex flex-1 items-center justify-center relative">
       <div
-        className="absolute w-72 h-72 rounded-full blur-3xl opacity-50 transition-all duration-500"
+        className="absolute w-72 h-72 rounded-full blur-3xl opacity-70 transition-all duration-500"
         style={{
           backgroundColor: isDark ? glowDark : glowLight,
         }}
@@ -128,6 +116,20 @@ export function LoginPage() {
 
   const roleVisualStyles = roleTheme[selectedRole]
 
+  const getRoleButtonStyle = (role: UserType, isSelected: boolean) => {
+    if (isSelected) {
+      if (role === "student") {
+        return "bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-105 border-blue-500/40"
+      }
+      if (role === "staff") {
+        return "bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 scale-105 border-emerald-500/40"
+      }
+      return "bg-orange-500 text-white shadow-lg shadow-orange-500/30 scale-105 border-orange-500/40"
+    }
+
+    return "text-gray-700 dark:text-gray-300 hover:bg-white/70 dark:hover:bg-white/10 border"
+  }
+
   const handleRoleChange = (role: UserType) => {
     setSelectedRole(role)
   }
@@ -165,8 +167,9 @@ export function LoginPage() {
         {isDark ? <Sun size={18} /> : <Moon size={18} />}
       </button>
 
-      <div className="w-full flex flex-col md:flex-row items-stretch min-h-screen">
-        <div className="w-full md:w-1/2 flex items-center justify-center px-4 py-10">
+      <div className="w-full px-6 py-8">
+        <div className="w-full max-w-6xl mx-auto flex items-center gap-8 md:gap-12">
+        <div className="w-full max-w-md">
           <div
             className="w-full max-w-md rounded-2xl backdrop-blur-xl p-6 shadow-xl"
             style={{
@@ -211,21 +214,17 @@ export function LoginPage() {
               {roleButtons.map((item) => {
                 const IconComponent = item.icon
                 const isSelected = selectedRole === item.id
-                const themeConfig = roleTheme[item.id as UserType]
+                const roleId = item.id as UserType
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => handleRoleChange(item.id as UserType)}
-                    className={`flex-1 py-2 rounded-xl border border-white/10 flex items-center justify-center gap-2 transition ${
-                      isSelected
-                        ? `${themeConfig.soft} ${themeConfig.text} ring-1 ${themeConfig.ring}`
-                        : "hover:opacity-90"
-                    }`}
+                    onClick={() => handleRoleChange(roleId)}
+                    className={`flex-1 py-2 rounded-xl flex items-center justify-center gap-2 transition-all duration-200 ${getRoleButtonStyle(roleId, isSelected)}`}
                     style={{
                       backgroundColor: isSelected
                         ? undefined
-                        : "var(--bg-card)",
+                        : isDark ? "rgba(255, 255, 255, 0.05)" : "rgba(255, 255, 255, 0.68)",
                       color: isSelected ? undefined : "var(--text-secondary)",
                       borderColor: "var(--border-color)",
                     }}
@@ -312,9 +311,9 @@ export function LoginPage() {
           </form>
           </div>
         </div>
+        <RoleVisual role={selectedRole} isDark={isDark} />
+        </div>
       </div>
-
-      <RoleVisual role={selectedRole} isDark={isDark} />
     </div>
   )
 }
