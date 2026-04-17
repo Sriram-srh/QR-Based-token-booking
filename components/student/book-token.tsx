@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { getAuthHeadersAsync } from "@/lib/client-auth"
 import type { Meal, MealType, MenuItem, BookedItem } from "@/lib/mock-data"
+import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -47,6 +48,7 @@ interface SelectedItem extends BookedItem {
 export function BookToken({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const { user } = useAuth()
   const [todayMeals, setTodayMeals] = useState<Meal[]>([])
+  const [bookedMeals, setBookedMeals] = useState<Set<MealType>>(new Set())
   const [confirmMeal, setConfirmMeal] = useState<MealType | null>(null)
   const [selectedItems, setSelectedItems] = useState<Map<string, SelectedItem>>(new Map())
   const [booked, setBooked] = useState(false)
@@ -90,22 +92,62 @@ export function BookToken({ onNavigate }: { onNavigate: (tab: string) => void })
   useEffect(() => {
     const fetchMeals = async () => {
       try {
-        const headers = await getAuthHeadersAsync()
-        const response = await fetch('/api/meals?view=student', { cache: 'no-store', headers })
-        const payload = await response.json()
-        if (!response.ok) return
+        if (!user?.studentId) {
+          setTodayMeals([])
+          setBookedMeals(new Set())
+          return
+        }
 
-        const rows = Array.isArray(payload?.data) ? payload.data : []
-        const meals = rows.map((row: any) => normalizeMeal(row))
+        const headers = await getAuthHeadersAsync()
         const today = toLocalDateString(new Date())
+
+        const [mealsResponse, tokensResponse] = await Promise.all([
+          fetch('/api/meals?view=student', { cache: 'no-store', headers }),
+          fetch(`/api/tokens?studentId=${user.studentId}`, { cache: 'no-store', headers }),
+        ])
+
+        const mealsPayload = await mealsResponse.json()
+        const tokensPayload = await tokensResponse.json()
+
+        if (!mealsResponse.ok) return
+
+        const rows = Array.isArray(mealsPayload?.data) ? mealsPayload.data : []
+        const meals = rows.map((row: any) => normalizeMeal(row))
         setTodayMeals(meals.filter((meal: Meal) => meal.date === today))
+
+        if (tokensResponse.ok) {
+          const tokenRows = [
+            ...(Array.isArray(tokensPayload?.active) ? tokensPayload.active : []),
+            ...(Array.isArray(tokensPayload?.used) ? tokensPayload.used : []),
+          ]
+
+          const nextBookedMeals = new Set<MealType>()
+          for (const token of tokenRows) {
+            const mealType = token?.meal_type as MealType
+            const createdAt = token?.created_at ? toLocalDateString(new Date(token.created_at)) : null
+            const status = String(token?.status || '')
+
+            if (
+              createdAt === today &&
+              (status === 'VALID' || status === 'USED') &&
+              (mealType === 'Breakfast' || mealType === 'Lunch' || mealType === 'Dinner')
+            ) {
+              nextBookedMeals.add(mealType)
+            }
+          }
+
+          setBookedMeals(nextBookedMeals)
+        } else {
+          setBookedMeals(new Set())
+        }
       } catch {
         setTodayMeals([])
+        setBookedMeals(new Set())
       }
     }
 
     fetchMeals()
-  }, [])
+  }, [user?.studentId])
 
   const handleBook = async () => {
     if (!confirmMeal || !user?.studentId) {
@@ -134,6 +176,11 @@ export function BookToken({ onNavigate }: { onNavigate: (tab: string) => void })
       }
 
       setBooked(true)
+      setBookedMeals((prev) => {
+        const next = new Set(prev)
+        next.add(confirmMeal)
+        return next
+      })
       setTimeout(() => {
         setConfirmMeal(null)
         setBooked(false)
@@ -148,6 +195,11 @@ export function BookToken({ onNavigate }: { onNavigate: (tab: string) => void })
   }
 
   const openConfirm = (mealType: MealType) => {
+    if (bookedMeals.has(mealType)) {
+      toast.error("You already booked this meal")
+      return
+    }
+
     setConfirmMeal(mealType)
     setSelectedItems(new Map())
   }
@@ -223,7 +275,8 @@ export function BookToken({ onNavigate }: { onNavigate: (tab: string) => void })
         {todayMeals.map(meal => {
           const percentBooked = Math.round((meal.bookedCount / meal.maxQuota) * 100)
           const remaining = meal.maxQuota - meal.bookedCount
-          const canBook = meal.isOpen && remaining > 0
+          const isBookedMeal = bookedMeals.has(meal.type)
+          const canBook = meal.isOpen && remaining > 0 && !isBookedMeal
 
           return (
             <Card key={meal.id} className={`overflow-hidden border-border/60 transition-all ${canBook ? "hover:shadow-lg hover:border-primary/40" : "opacity-70"}`}>
@@ -265,17 +318,28 @@ export function BookToken({ onNavigate }: { onNavigate: (tab: string) => void })
                     <Ticket className="h-3 w-3" />
                     Live quota status
                   </div>
-                  <Badge variant={meal.isOpen ? "default" : "secondary"} className={meal.isOpen ? "bg-success text-success-foreground" : ""}>
-                    {meal.isOpen ? "Open" : "Closed"}
+                  <Badge
+                    variant={isBookedMeal ? "outline" : meal.isOpen ? "default" : "secondary"}
+                    className={
+                      isBookedMeal
+                        ? "border-muted-foreground/40 text-muted-foreground"
+                        : meal.isOpen
+                          ? "bg-success text-success-foreground"
+                          : ""
+                    }
+                  >
+                    {isBookedMeal ? "Already Booked" : meal.isOpen ? "Open" : "Closed"}
                   </Badge>
                 </div>
 
                 <Button
-                  className="w-full gap-2"
+                  className={`w-full gap-2 ${isBookedMeal ? "bg-muted text-muted-foreground cursor-not-allowed hover:bg-muted" : ""}`}
                   disabled={!canBook}
                   onClick={() => openConfirm(meal.type)}
                 >
-                  {!meal.isOpen ? (
+                  {isBookedMeal ? (
+                    "Already Booked"
+                  ) : !meal.isOpen ? (
                     "Booking Closed"
                   ) : remaining <= 0 ? (
                     "Quota Full"
