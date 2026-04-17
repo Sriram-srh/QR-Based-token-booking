@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useTheme } from "next-themes"
 import { useAuth, type UserType } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,45 +32,63 @@ const demoCredentials: Record<UserType, string> = {
   admin: "admin@example.com",
 }
 
-const roleButtonStyles: Record<UserType, string> = {
-  student: "bg-blue-600 text-white",
-  staff: "bg-emerald-600 text-white",
-  admin: "bg-amber-600 text-white",
-}
-
-const roleLoginStyles: Record<UserType, string> = {
-  student: "from-blue-500 to-indigo-600",
-  staff: "from-emerald-500 to-teal-600",
-  admin: "from-amber-500 to-orange-600",
-}
-
-const roleVisualStyles: Record<UserType, { gradient: string; label: string; Icon: typeof GraduationCap }> = {
+const roleTheme: Record<
+  UserType,
+  {
+    primary: string
+    glow: string
+    text: string
+    ring: string
+    soft: string
+    shadow: string
+    icon: typeof GraduationCap
+    label: string
+  }
+> = {
   student: {
-    gradient: "from-blue-500 to-indigo-500",
+    primary: "from-blue-500 to-indigo-600",
+    glow: "rgba(59,130,246,0.55)",
+    text: "text-blue-400",
+    ring: "ring-blue-500/30",
+    soft: "bg-blue-500/10",
+    shadow: "shadow-blue-500/20",
+    icon: GraduationCap,
     label: "student",
-    Icon: GraduationCap,
   },
   staff: {
-    gradient: "from-orange-500 to-yellow-500",
+    primary: "from-emerald-500 to-green-600",
+    glow: "rgba(16,185,129,0.55)",
+    text: "text-emerald-400",
+    ring: "ring-emerald-500/30",
+    soft: "bg-emerald-500/10",
+    shadow: "shadow-emerald-500/20",
+    icon: Wrench,
     label: "staff",
-    Icon: Wrench,
   },
   admin: {
-    gradient: "from-red-500 to-pink-500",
+    primary: "from-orange-500 to-red-500",
+    glow: "rgba(249,115,22,0.55)",
+    text: "text-orange-400",
+    ring: "ring-orange-500/30",
+    soft: "bg-orange-500/10",
+    shadow: "shadow-orange-500/20",
+    icon: Shield,
     label: "admin",
-    Icon: Shield,
   },
 }
 
 function RoleVisual({ role }: { role: UserType }) {
-  const { Icon, gradient, label } = roleVisualStyles[role]
+  const { icon: Icon, primary, glow, label } = roleTheme[role]
 
   return (
     <div className="hidden md:flex w-1/2 items-center justify-center relative">
-      <div className={`absolute w-72 h-72 rounded-full blur-3xl opacity-30 bg-gradient-to-br ${gradient}`} />
+      <div
+        className="absolute w-72 h-72 rounded-full blur-3xl opacity-50 transition-all duration-500"
+        style={{ backgroundColor: glow }}
+      />
 
       <div
-        className={`relative w-64 h-64 rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center shadow-2xl transition-all duration-500 animate-float`}
+        className={`relative w-64 h-64 rounded-full flex items-center justify-center bg-gradient-to-br ${primary} shadow-2xl transition-all duration-500 animate-float`}
       >
         <div className="absolute inset-2 rounded-full bg-white/10 backdrop-blur-xl" />
         <div key={role} className="relative text-white transition-all duration-500 scale-100">
@@ -77,7 +96,7 @@ function RoleVisual({ role }: { role: UserType }) {
         </div>
       </div>
 
-      <p className="absolute bottom-16 text-gray-400 text-lg capitalize tracking-wide">
+      <p className="absolute bottom-16 text-gray-500 dark:text-gray-400 text-lg capitalize tracking-wide">
         {label}
       </p>
     </div>
@@ -86,11 +105,16 @@ function RoleVisual({ role }: { role: UserType }) {
 
 export function LoginPage() {
   const { login, loading, error, clearError } = useAuth()
+  const { resolvedTheme, setTheme } = useTheme()
   const [selectedRole, setSelectedRole] = useState<UserType>("student")
   const [email, setEmail] = useState(demoCredentials.student)
   const [password, setPassword] = useState("Mkce@1122")
   const [showPassword, setShowPassword] = useState(false)
-  const [theme, setTheme] = useState<"dark" | "light">("dark")
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     setEmail(demoCredentials[selectedRole])
@@ -98,16 +122,7 @@ export function LoginPage() {
     clearError()
   }, [selectedRole, clearError])
 
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains("dark")
-    setTheme(isDark ? "dark" : "light")
-  }, [])
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", theme === "dark")
-    document.documentElement.classList.toggle("light", theme === "light")
-    localStorage.setItem("theme", theme)
-  }, [theme])
+  const isDark = mounted ? resolvedTheme !== "light" : true
 
   const handleRoleChange = (role: UserType) => {
     setSelectedRole(role)
@@ -128,17 +143,19 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-gray-100 to-blue-100 dark:from-gray-900 dark:to-black text-gray-900 dark:text-white">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-200 dark:from-gray-900 dark:via-black dark:to-gray-950 text-gray-900 dark:text-white">
       <button
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        onClick={() => setTheme(isDark ? "light" : "dark")}
         className="absolute top-5 right-5 p-2 rounded-full bg-gray-200 dark:bg-gray-800 transition z-10"
         aria-label="Toggle theme"
+        disabled={!mounted}
       >
-        {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+        {isDark ? <Sun size={18} /> : <Moon size={18} />}
       </button>
 
-      <div className="w-full md:w-1/2 flex items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl p-6 shadow-xl text-white">
+      <div className="w-full flex flex-col md:flex-row items-stretch min-h-screen">
+        <div className="w-full md:w-1/2 flex items-center justify-center px-4 py-10">
+          <div className="w-full max-w-md rounded-2xl border border-white/10 dark:border-white/10 bg-white/80 dark:bg-white/10 backdrop-blur-xl p-6 shadow-xl text-gray-900 dark:text-white">
           <h1 className="text-2xl font-bold text-center">
             MKCE Hostel Queue System
           </h1>
@@ -154,7 +171,7 @@ export function LoginPage() {
 
           <form onSubmit={handleLogin} className="space-y-4 mt-5">
             {error && (
-              <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-200">
+              <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-200">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -164,6 +181,7 @@ export function LoginPage() {
               {roleButtons.map((item) => {
                 const IconComponent = item.icon
                 const isSelected = selectedRole === item.id
+                const themeConfig = roleTheme[item.id as UserType]
                 return (
                   <button
                     key={item.id}
@@ -171,8 +189,8 @@ export function LoginPage() {
                     onClick={() => handleRoleChange(item.id as UserType)}
                     className={`flex-1 py-2 rounded-xl border border-white/10 flex items-center justify-center gap-2 transition ${
                       isSelected
-                        ? roleButtonStyles[item.id as UserType]
-                        : "bg-gray-700 hover:bg-gray-600 text-white"
+                        ? `${themeConfig.soft} ${themeConfig.text} ring-1 ${themeConfig.ring}`
+                        : "bg-gray-700/80 hover:bg-gray-600 text-white dark:bg-gray-700 dark:hover:bg-gray-600"
                     }`}
                   >
                     <IconComponent size={16} />
@@ -183,7 +201,7 @@ export function LoginPage() {
             </div>
 
             <div className="space-y-1.5 mt-1">
-              <Label htmlFor="email" className="text-gray-300">Email Address</Label>
+              <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email Address</Label>
               <Input
                 id="email"
                 type="email"
@@ -193,12 +211,12 @@ export function LoginPage() {
                   clearError()
                 }}
                 disabled={loading}
-                className="bg-gray-800/60 border-gray-700 text-white"
+                className="bg-white/80 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-gray-300">Password</Label>
+              <Label htmlFor="password" className="text-gray-700 dark:text-gray-300">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -209,12 +227,12 @@ export function LoginPage() {
                     clearError()
                   }}
                   disabled={loading}
-                  className="bg-gray-800/60 border-gray-700 text-white pr-10"
+                  className="bg-white/80 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -224,7 +242,7 @@ export function LoginPage() {
 
             <Button
               type="submit"
-              className={`w-full mt-2 py-3 rounded-xl bg-gradient-to-r ${roleLoginStyles[selectedRole]} font-semibold hover:opacity-90 transition h-auto gap-2 disabled:opacity-70 disabled:cursor-not-allowed`}
+              className={`w-full mt-2 py-3 rounded-xl bg-gradient-to-r ${roleTheme[selectedRole].primary} font-semibold hover:opacity-90 transition h-auto gap-2 disabled:opacity-70 disabled:cursor-not-allowed`}
               disabled={loading}
             >
               {loading ? (
@@ -240,10 +258,11 @@ export function LoginPage() {
               )}
             </Button>
 
-            <p className="text-xs text-gray-400 mt-1 text-center">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">
               Demo: {demoCredentials[selectedRole]} / Mkce@1122
             </p>
           </form>
+          </div>
         </div>
       </div>
 
