@@ -36,55 +36,57 @@ const roleTheme: Record<
   UserType,
   {
     primary: string
-    glow: string
+    glowDark: string
+    glowLight: string
     text: string
     ring: string
     soft: string
-    shadow: string
     icon: typeof GraduationCap
     label: string
   }
 > = {
   student: {
     primary: "from-blue-500 to-indigo-600",
-    glow: "rgba(59,130,246,0.55)",
+    glowDark: "rgba(59,130,246,0.6)",
+    glowLight: "rgba(59,130,246,0.25)",
     text: "text-blue-400",
     ring: "ring-blue-500/30",
     soft: "bg-blue-500/10",
-    shadow: "shadow-blue-500/20",
     icon: GraduationCap,
     label: "student",
   },
   staff: {
     primary: "from-emerald-500 to-green-600",
-    glow: "rgba(16,185,129,0.55)",
+    glowDark: "rgba(16,185,129,0.6)",
+    glowLight: "rgba(16,185,129,0.25)",
     text: "text-emerald-400",
     ring: "ring-emerald-500/30",
     soft: "bg-emerald-500/10",
-    shadow: "shadow-emerald-500/20",
     icon: Wrench,
     label: "staff",
   },
   admin: {
     primary: "from-orange-500 to-red-500",
-    glow: "rgba(249,115,22,0.55)",
+    glowDark: "rgba(249,115,22,0.6)",
+    glowLight: "rgba(249,115,22,0.25)",
     text: "text-orange-400",
     ring: "ring-orange-500/30",
     soft: "bg-orange-500/10",
-    shadow: "shadow-orange-500/20",
     icon: Shield,
     label: "admin",
   },
 }
 
-function RoleVisual({ role }: { role: UserType }) {
-  const { icon: Icon, primary, glow, label } = roleTheme[role]
+function RoleVisual({ role, isDark }: { role: UserType; isDark: boolean }) {
+  const { icon: Icon, primary, glowDark, glowLight, label } = roleTheme[role]
 
   return (
     <div className="hidden md:flex w-1/2 items-center justify-center relative">
       <div
         className="absolute w-72 h-72 rounded-full blur-3xl opacity-50 transition-all duration-500"
-        style={{ backgroundColor: glow }}
+        style={{
+          backgroundColor: isDark ? glowDark : glowLight,
+        }}
       />
 
       <div
@@ -124,6 +126,8 @@ export function LoginPage() {
 
   const isDark = mounted ? resolvedTheme !== "light" : true
 
+  const roleVisualStyles = roleTheme[selectedRole]
+
   const handleRoleChange = (role: UserType) => {
     setSelectedRole(role)
   }
@@ -143,10 +147,18 @@ export function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 via-white to-gray-200 dark:from-gray-900 dark:via-black dark:to-gray-950 text-gray-900 dark:text-white">
+    <div
+      className="min-h-screen flex items-center justify-center text-gray-900 dark:text-white"
+      style={{ backgroundColor: "var(--bg-primary)" }}
+    >
       <button
         onClick={() => setTheme(isDark ? "light" : "dark")}
-        className="absolute top-5 right-5 p-2 rounded-full bg-gray-200 dark:bg-gray-800 transition z-10"
+        className="absolute top-5 right-5 p-2 rounded-full transition z-10"
+        style={{
+          backgroundColor: isDark ? "rgba(15, 23, 42, 0.7)" : "rgba(255, 255, 255, 0.75)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border-color)",
+        }}
         aria-label="Toggle theme"
         disabled={!mounted}
       >
@@ -155,23 +167,41 @@ export function LoginPage() {
 
       <div className="w-full flex flex-col md:flex-row items-stretch min-h-screen">
         <div className="w-full md:w-1/2 flex items-center justify-center px-4 py-10">
-          <div className="w-full max-w-md rounded-2xl border border-white/10 dark:border-white/10 bg-white/80 dark:bg-white/10 backdrop-blur-xl p-6 shadow-xl text-gray-900 dark:text-white">
-          <h1 className="text-2xl font-bold text-center">
+          <div
+            className="w-full max-w-md rounded-2xl backdrop-blur-xl p-6 shadow-xl"
+            style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-color)",
+              color: "var(--text-primary)",
+            }}
+          >
+          <h1 className="text-2xl font-bold text-center" style={{ color: "var(--text-primary)" }}>
             MKCE Hostel Queue System
           </h1>
-          <p className="text-sm text-center text-gray-300 mt-1">
+          <p className="text-sm text-center mt-1" style={{ color: "var(--text-secondary)" }}>
             A QR-Based Smart Meal Token Platform
           </p>
 
           <div className="flex justify-center mt-2">
-            <span className="inline-block mt-2 text-xs bg-blue-500/20 text-blue-300 px-3 py-1 rounded-full">
+            <span
+              className="inline-block mt-2 text-xs px-3 py-1 rounded-full"
+              style={{
+                backgroundColor: isDark ? "rgba(59,130,246,0.16)" : "rgba(59,130,246,0.12)",
+                color: isDark ? "#bfdbfe" : "#2563eb",
+                border: "1px solid var(--border-color)",
+              }}
+            >
               🎓 MKCE Project
             </span>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4 mt-5">
             {error && (
-              <Alert variant="destructive" className="bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-200">
+              <Alert
+                variant="destructive"
+                className="bg-red-500/10 border-red-500/30"
+                style={{ color: isDark ? "#fecaca" : "#b91c1c" }}
+              >
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
@@ -190,8 +220,15 @@ export function LoginPage() {
                     className={`flex-1 py-2 rounded-xl border border-white/10 flex items-center justify-center gap-2 transition ${
                       isSelected
                         ? `${themeConfig.soft} ${themeConfig.text} ring-1 ${themeConfig.ring}`
-                        : "bg-gray-700/80 hover:bg-gray-600 text-white dark:bg-gray-700 dark:hover:bg-gray-600"
+                        : "hover:opacity-90"
                     }`}
+                    style={{
+                      backgroundColor: isSelected
+                        ? undefined
+                        : "var(--bg-card)",
+                      color: isSelected ? undefined : "var(--text-secondary)",
+                      borderColor: "var(--border-color)",
+                    }}
                   >
                     <IconComponent size={16} />
                     {item.label}
@@ -201,7 +238,7 @@ export function LoginPage() {
             </div>
 
             <div className="space-y-1.5 mt-1">
-              <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email Address</Label>
+              <Label htmlFor="email" style={{ color: "var(--text-secondary)" }}>Email Address</Label>
               <Input
                 id="email"
                 type="email"
@@ -211,12 +248,17 @@ export function LoginPage() {
                   clearError()
                 }}
                 disabled={loading}
-                className="bg-white/80 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white"
+                className="text-gray-900 dark:text-white"
+                style={{
+                  background: "var(--bg-card)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-color)",
+                }}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-gray-700 dark:text-gray-300">Password</Label>
+              <Label htmlFor="password" style={{ color: "var(--text-secondary)" }}>Password</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -227,12 +269,18 @@ export function LoginPage() {
                     clearError()
                   }}
                   disabled={loading}
-                  className="bg-white/80 dark:bg-gray-800/60 border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white pr-10"
+                  className="text-gray-900 dark:text-white pr-10"
+                  style={{
+                    background: "var(--bg-card)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-color)",
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-80"
+                  style={{ color: "var(--text-secondary)" }}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -242,7 +290,7 @@ export function LoginPage() {
 
             <Button
               type="submit"
-              className={`w-full mt-2 py-3 rounded-xl bg-gradient-to-r ${roleTheme[selectedRole].primary} font-semibold hover:opacity-90 transition h-auto gap-2 disabled:opacity-70 disabled:cursor-not-allowed`}
+              className={`w-full mt-2 py-3 rounded-xl bg-gradient-to-r ${roleVisualStyles.primary} font-semibold hover:opacity-90 transition h-auto gap-2 disabled:opacity-70 disabled:cursor-not-allowed`}
               disabled={loading}
             >
               {loading ? (
@@ -258,7 +306,7 @@ export function LoginPage() {
               )}
             </Button>
 
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">
+            <p className="text-xs mt-1 text-center" style={{ color: "var(--text-secondary)" }}>
               Demo: {demoCredentials[selectedRole]} / Mkce@1122
             </p>
           </form>
@@ -266,7 +314,7 @@ export function LoginPage() {
         </div>
       </div>
 
-      <RoleVisual role={selectedRole} />
+      <RoleVisual role={selectedRole} isDark={isDark} />
     </div>
   )
 }

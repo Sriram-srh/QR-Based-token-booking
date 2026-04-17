@@ -10,6 +10,11 @@
 
 @layer base {
   :root {
+    --bg-primary: #f8fafc;
+    --bg-card: rgba(255, 255, 255, 0.7);
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: rgba(0, 0, 0, 0.1);
     --background: 210 20% 98%;
     --foreground: 220 20% 10%;
     --card: 0 0% 100%;
@@ -49,6 +54,11 @@
     --warning-foreground: 220 20% 10%;
   }
   .dark {
+    --bg-primary: #020617;
+    --bg-card: rgba(255, 255, 255, 0.05);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: rgba(255, 255, 255, 0.1);
     --background: 220 20% 7%;
     --foreground: 210 16% 95%;
     --card: 220 18% 10%;
