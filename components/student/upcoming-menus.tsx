@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { getMealCost } from "@/lib/mock-data"
 import type { Meal, MenuItem, PreBooking } from "@/lib/mock-data"
 import { useAuth } from "@/lib/auth-context"
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Coffee, Sun, Moon, Plus, Minus, Check, AlertCircle, IndianRupee } from "lucide-react"
+import { toast } from "sonner"
 
 const mealIcons: Record<string, React.ReactNode> = {
   Breakfast: <Coffee className="h-5 w-5" />,
@@ -29,6 +31,7 @@ interface SelectedItem extends MenuItem {
 
 export function UpcomingMenus() {
   const { user } = useAuth()
+  const router = useRouter()
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null)
   const [preBookingOpen, setPreBookingOpen] = useState(false)
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([])
@@ -185,6 +188,7 @@ export function UpcomingMenus() {
   const confirmPreBooking = async () => {
     if (!selectedMeal || selectedItems.length === 0 || !studentId) return
 
+    console.log('CONFIRM CLICKED')
     setSubmitting(true)
     try {
       const headers = await getAuthHeadersAsync()
@@ -210,15 +214,19 @@ export function UpcomingMenus() {
       const data = await parseJsonSafe(response)
       if (!response.ok) {
         console.error('[v0] Create pre-booking failed:', data)
+        toast.error(data.error || 'Failed to create pre-booking')
         return
       }
 
-      await fetchPreBookings()
+      toast.success('Meal booked successfully')
       setPreBookingOpen(false)
       setSelectedMeal(null)
       setSelectedItems([])
+      await fetchPreBookings()
+      router.refresh()
     } catch (error) {
       console.error('[v0] Failed to create pre-booking:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to create pre-booking')
     } finally {
       setSubmitting(false)
     }
