@@ -296,7 +296,7 @@ export function StudentAccounts() {
               <DialogHeader>
                 <DialogTitle className="text-foreground">Create Student Account</DialogTitle>
                 <DialogDescription>
-                  Enter student details to create account. A login user will be created automatically with password: password123
+                  Enter student details to create account. A login user will be created automatically with password: Default@123
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
@@ -418,7 +418,7 @@ export function StudentAccounts() {
               </div>
               <div className="text-center">
                 <h3 className="text-lg font-semibold text-foreground">Account Created!</h3>
-                <p className="text-sm text-muted-foreground">Student can log in with their email and password: <code className="bg-muted p-1 rounded">password123</code></p>
+                <p className="text-sm text-muted-foreground">Student can log in with their email and password: <code className="bg-muted p-1 rounded">Default@123</code></p>
               </div>
             </div>
           )}

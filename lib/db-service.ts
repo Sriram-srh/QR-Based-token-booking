@@ -494,6 +494,8 @@ export async function createStudent(
     const supabase = getSupabaseAdminClient();
 
     const defaultPassword = 'Default@123';
+    let authUserId: string | null = null;
+    let createdAuthUser = false;
 
     const { data: authCreated, error: authError } = await supabase.auth.admin.createUser({
       email,
@@ -503,17 +505,60 @@ export async function createStudent(
       user_metadata: { role: 'student', name },
     });
 
-    if (authError || !authCreated?.user?.id) {
-      console.error('[v0] Error creating auth user:', authError);
-      return { success: false, error: authError?.message || 'Failed to create auth user' };
+    if (authCreated?.user?.id) {
+      authUserId = authCreated.user.id;
+      createdAuthUser = true;
+    } else {
+      const authErrorMessage = String(authError?.message || '').toLowerCase();
+      const isExistingAuthUser = authErrorMessage.includes('already')
+        && (authErrorMessage.includes('registered') || authErrorMessage.includes('exists'));
+
+      if (!isExistingAuthUser) {
+        console.error('[v0] Error creating auth user:', authError);
+        return { success: false, error: authError?.message || 'Failed to create auth user' };
+      }
+
+      const { data: existingUserRow, error: existingUserLookupError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      const existingUserId = (existingUserRow as { id?: string } | null)?.id;
+
+      if (existingUserLookupError || !existingUserId) {
+        console.error('[v0] Error finding existing auth user by email:', existingUserLookupError);
+        return { success: false, error: 'User already exists but could not be synced' };
+      }
+
+      const { data: updatedAuthUser, error: updateAuthError } = await supabase.auth.admin.updateUserById(
+        existingUserId,
+        {
+          password: defaultPassword,
+          email_confirm: true,
+          app_metadata: { role: 'student' },
+          user_metadata: { role: 'student', name },
+        }
+      );
+
+      if (updateAuthError || !updatedAuthUser?.user?.id) {
+        console.error('[v0] Error resetting password for existing auth user:', updateAuthError);
+        return { success: false, error: updateAuthError?.message || 'Failed to reset user password' };
+      }
+
+      authUserId = updatedAuthUser.user.id;
     }
 
-    const authUserId = authCreated.user.id;
+    if (!authUserId) {
+      return { success: false, error: 'Failed to resolve auth user id' };
+    }
 
     const userRow = await waitForSyncedUserRow(supabase, authUserId);
 
     if (!userRow) {
-      await supabase.auth.admin.deleteUser(authUserId);
+      if (createdAuthUser) {
+        await supabase.auth.admin.deleteUser(authUserId);
+      }
       console.error('[v0] Error waiting for synced user row:', authUserId);
       return { success: false, error: 'User sync failed' };
     }
@@ -536,8 +581,15 @@ export async function createStudent(
       .single();
 
     if (studentError || !studentData) {
-      // Rollback auth creation if student creation fails
-      await supabase.auth.admin.deleteUser(authUserId);
+      const studentErrorMessage = String(studentError?.message || '').toLowerCase();
+      if (!createdAuthUser && (studentErrorMessage.includes('duplicate key') || studentErrorMessage.includes('already exists'))) {
+        return { success: false, error: `Student already exists. Password has been reset to ${defaultPassword}.` };
+      }
+
+      // Rollback auth creation only if this call created the auth user.
+      if (createdAuthUser) {
+        await supabase.auth.admin.deleteUser(authUserId);
+      }
       console.error('[v0] Error creating student record:', studentError);
       return { success: false, error: studentError?.message || 'Failed to create student record' };
     }
