@@ -1,7 +1,17 @@
 {
-  "name": "my-project",
+  "name": "smartmeal-qr",
   "version": "0.1.0",
   "private": true,
+  "description": "SmartMeal QR is a hostel meal queue and management system with QR token verification, pre-booking, and role-based dashboards.",
+  "license": "MIT",
+  "keywords": [
+    "nextjs",
+    "react",
+    "supabase",
+    "qr-code",
+    "hostel-management",
+    "full-stack-project"
+  ],
   "scripts": {
     "dev": "next dev",
     "dev:turbo": "next dev --turbo",
