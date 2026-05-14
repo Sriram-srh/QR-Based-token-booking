@@ -103,21 +103,6 @@ https://your-project.vercel.app
 - Exportable reports and analytics
 - Automated notification scheduling
 
-## Resume Summary
-
-SmartMeal QR - Hostel Food Queue & Meal Management System
-
-Next.js, React, TypeScript, Supabase, PostgreSQL
-
-Developed a QR-based meal booking and verification system for hostel food management.
-Implemented role-based authentication for students, staff, and administrators.
-Designed real-time meal tracking and pre-booking features to reduce queue time and food wastage.
-Built a responsive frontend and integrated backend APIs using Supabase.
-
-GitHub: <add-your-repo-link>
-
-Live Demo: https://your-project.vercel.app
-
 ## License
 
 This project is licensed under the MIT License.
